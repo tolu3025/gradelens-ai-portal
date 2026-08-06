@@ -29,7 +29,7 @@ function AdminStudentsPage() {
       if (profilesError) throw profilesError;
       const profiles = profilesData ?? [];
 
-      // Secondary source: students table (has level, department, CGPA)
+      // Secondary source: students table (has level, department)
       const { data: studentsData } = await supabase
         .from("students")
         .select("matric_no, student_name, level, department, programme");
@@ -39,18 +39,17 @@ function AdminStudentsPage() {
         studentMap.set(s.matric_no, s);
       }
 
-      // Merge: every profile is a user; enrich with student record if matric matches
+      // Merge: every profile is a registered user; enrich with student record if matric matches
       const merged = profiles.map((p: any) => {
-        const studentRow = p.matric_no ? studentMap.get(p.matric_no) : null;
+        const matric = p.matric_no ?? null;
+        const studentRow = matric ? studentMap.get(matric) : null;
         return {
           id: p.id,
-          matric_no: p.matric_no ?? "—",
+          matric_no: matric,
           student_name: p.full_name ?? p.email?.split("@")[0] ?? "Unknown",
           email: p.email,
           level: studentRow?.level ?? null,
           department: studentRow?.department ?? null,
-          cgpa_summary: null,  // will fetch below if needed
-          predictions: null,
         };
       });
 
