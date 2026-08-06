@@ -27,7 +27,7 @@ function Landing() {
         {/* HERO SECTION */}
         <section className="text-center animate-[fade-in_0.6s_ease-out]">
           <div className="mt-4 flex items-center justify-center">
-            <img src="/logo.png" alt="GradeLens Logo" className="size-24 object-contain rounded-2xl shadow-xl border border-primary/20" />
+            <img src="/logo.png" alt="GradeLens Logo" className="h-28 w-auto object-contain" />
           </div>
 
           <h1 className="mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight md:text-6xl text-gradient">
