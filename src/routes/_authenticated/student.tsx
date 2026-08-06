@@ -550,6 +550,42 @@ function StudentPage() {
               </div>
 
               <div className="mt-6 space-y-4">
+                {/* AUTOMATED RESULT DOCUMENT SCRAPER BOX */}
+                <div className="rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 p-5 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <FileSpreadsheet className="size-8 text-primary" />
+                    <span className="text-sm font-bold text-foreground">Auto-Scrape Printed Result Document (.PDF / .TXT / .CSV)</span>
+                    <span className="text-xs text-muted-foreground max-w-md">
+                      Upload your printed school portal result document to automatically extract course codes, credit units, scores, current GPA, and CGPA metrics.
+                    </span>
+                    <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-md">
+                      <Upload className="size-4" /> Select Result Document File
+                      <input
+                        type="file"
+                        accept=".pdf,.txt,.csv,.doc,.docx"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          toast.info(`Reading document: ${file.name}…`);
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const rawText = (event.target?.result as string) || "";
+                            const parsed = scrapeResultDocumentText(rawText);
+                            if (parsed.courses.length > 0) {
+                              setCoursesList(parsed.courses);
+                              toast.success(`Scraped ${parsed.courses.length} courses & GPA from ${file.name}!`);
+                            } else {
+                              toast.info("Document loaded. Please verify course entries below.");
+                            }
+                          };
+                          reader.readAsText(file);
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Academic Level *</label>
@@ -803,4 +839,47 @@ function subStatusTone(s: string) {
   if (s === "APPROVED") return "bg-success/15 text-success border border-success/30";
   if (s === "PENDING") return "bg-warning/15 text-warning border border-warning/30";
   return "bg-destructive/15 text-destructive border border-destructive/30";
+}
+
+function scrapeResultDocumentText(rawText: string) {
+  const lines = rawText.split(/\r?\n/);
+  const courses: Array<{ code: string; title: string; cu: number; score: number }> = [];
+
+  let currentGpa: number | null = null;
+  let previousGpa: number | null = null;
+
+  const courseRegex = /([A-Z]{2,4}\s?\d{3})/i;
+  const gpaRegex = /(?:current\s+)?gpa[:\s]+([0-4]\.\d{1,2}|5\.00?)/i;
+  const cgpaRegex = /(?:previous\s+gpa|cgpa)[:\s]+([0-4]\.\d{1,2}|5\.00?)/i;
+
+  for (const line of lines) {
+    const gMatch = line.match(gpaRegex);
+    if (gMatch && !currentGpa) currentGpa = parseFloat(gMatch[1]);
+
+    const cgMatch = line.match(cgpaRegex);
+    if (cgMatch && !previousGpa) previousGpa = parseFloat(cgMatch[1]);
+
+    const cMatch = line.match(courseRegex);
+    if (cMatch) {
+      const code = cMatch[1].toUpperCase();
+      const numbers = line.match(/\b\d{1,3}\b/g)?.map(Number) ?? [];
+
+      const cu = numbers.find((n) => n >= 1 && n <= 6) ?? 3;
+      const score = numbers.find((n) => n >= 35 && n <= 100) ?? 70;
+
+      let title = line
+        .replace(cMatch[0], "")
+        .replace(/\b\d{1,3}\b/g, "")
+        .replace(/[A-F]\b/i, "")
+        .trim();
+
+      if (!title || title.length < 3) {
+        title = `Course ${code}`;
+      }
+
+      courses.push({ code, title, cu, score });
+    }
+  }
+
+  return { courses, currentGpa, previousGpa };
 }
