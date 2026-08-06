@@ -40,7 +40,8 @@ function AuthPage() {
         const formattedMatric = matric.trim().toUpperCase() || `2024/${Math.floor(10000 + Math.random() * 90000)}`;
         const selectedLevel = Number(level) || 100;
 
-        const { error } = await supabase.auth.signUp({
+        // Step 1: Create account
+        const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -48,9 +49,13 @@ function AuthPage() {
             data: { full_name: fullName, matric_no: formattedMatric, level: selectedLevel },
           },
         });
-        if (error) throw error;
+        if (signUpError) throw signUpError;
 
-        // Upsert student record into Supabase students table with Level and Matric number
+        // Step 2: Sign in immediately to get an authenticated session
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) throw signInError;
+
+        // Step 3: Now authenticated — write student record (RLS allows authenticated users)
         await supabase.from("students").upsert({
           matric_no: formattedMatric,
           student_name: fullName || email.split("@")[0],
@@ -72,6 +77,7 @@ function AuthPage() {
       setLoading(false);
     }
   }
+
 
   return (
     <div className="min-h-screen">

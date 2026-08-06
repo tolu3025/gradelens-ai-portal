@@ -45,8 +45,7 @@ function AdminPage() {
     queryKey: ["admin-stats"],
     enabled: !!isAdmin,
     queryFn: async () => {
-      const [students, profiles, counselors, referrals, cgpa, predictions] = await Promise.all([
-        supabase.from("students").select("matric_no", { count: "exact", head: true }),
+      const [profiles, counselors, referrals, cgpa, predictions] = await Promise.all([
         supabase.from("profiles").select("id", { count: "exact", head: true }),
         supabase.from("counselors").select("id", { count: "exact", head: true }),
         supabase.from("counselor_referrals").select("status"),
@@ -54,7 +53,8 @@ function AdminPage() {
         supabase.from("predictions").select("risk_level"),
       ]);
 
-      const totalStudents = Math.max((students.count ?? 0) + (profiles.count ?? 0), 60);
+      // profiles = all registered users (students + admins + counselors)
+      const totalStudents = profiles.count ?? 0;
 
       const refByStatus: Record<string, number> = {};
       for (const r of referrals.data ?? []) refByStatus[r.status] = (refByStatus[r.status] ?? 0) + 1;
@@ -77,14 +77,14 @@ function AdminPage() {
 
       return {
         students: totalStudents,
-        counselors: counselors.count ?? 2,
-        referrals: referrals.data?.length ?? 5,
+        counselors: counselors.count ?? 0,
+        referrals: referrals.data?.length ?? 0,
         refByStatus,
         classCounts,
-        avgCgpa: total ? sum / total : 3.12,
-        highRiskCount: highRiskCount || 8,
-        mediumRiskCount: mediumRiskCount || 18,
-        lowRiskCount: lowRiskCount || 34,
+        avgCgpa: total ? sum / total : 0,
+        highRiskCount,
+        mediumRiskCount,
+        lowRiskCount,
       };
     },
   });
