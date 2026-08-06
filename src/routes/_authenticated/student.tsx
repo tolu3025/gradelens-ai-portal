@@ -121,33 +121,62 @@ function StudentPage() {
   const isProfileComplete = !!(studentDbQ.data?.prof?.matric_no || studentDbQ.data?.student?.matric_no);
 
   const cgpaQ = useQuery({
-    queryKey: ["cgpa", activeMatric],
-    enabled: !!activeMatric,
+    queryKey: ["cgpa", activeMatric, me?.matricNo],
+    enabled: !!activeMatric || !!me?.matricNo,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const mat = (activeMatric || me?.matricNo || "").trim();
+      if (!mat) return null;
+
+      const { data: exactData } = await supabase
         .from("cgpa_summary")
         .select("*")
-        .eq("matric_no", activeMatric!)
+        .ilike("matric_no", mat)
         .order("level", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (error) throw error;
-      return data;
+
+      if (exactData) return exactData;
+
+      const { data: allCgpa } = await supabase.from("cgpa_summary").select("*");
+      if (!allCgpa) return null;
+
+      const matClean = mat.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+      return allCgpa.find((c: any) => {
+        const cClean = (c.matric_no ?? "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        return cClean === matClean || (matClean.length >= 4 && cClean.includes(matClean));
+      }) ?? null;
     },
   });
 
   const gradesQ = useQuery({
-    queryKey: ["grades", activeMatric],
-    enabled: !!activeMatric,
+    queryKey: ["grades", activeMatric, me?.matricNo],
+    enabled: !!activeMatric || !!me?.matricNo,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const mat = (activeMatric || me?.matricNo || "").trim();
+      if (!mat) return [];
+
+      const { data: exactData } = await supabase
         .from("grades")
         .select("*")
-        .eq("matric_no", activeMatric!)
+        .ilike("matric_no", mat)
         .order("level", { ascending: true })
         .order("semester", { ascending: true });
-      if (error) throw error;
-      return data ?? [];
+
+      if (exactData && exactData.length > 0) return exactData;
+
+      const { data: allGrades } = await supabase
+        .from("grades")
+        .select("*")
+        .order("level", { ascending: true })
+        .order("semester", { ascending: true });
+
+      if (!allGrades) return [];
+
+      const matClean = mat.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+      return allGrades.filter((g: any) => {
+        const gClean = (g.matric_no ?? "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        return gClean === matClean || (matClean.length >= 4 && gClean.includes(matClean));
+      });
     },
   });
 

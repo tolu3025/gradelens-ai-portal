@@ -18,14 +18,31 @@ function MyGradesPage() {
     queryKey: ["grades", matric],
     enabled: !!matric,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const mat = (matric || "").trim();
+      if (!mat) return [];
+
+      const { data: exactData } = await supabase
         .from("grades")
         .select("*")
-        .eq("matric_no", matric!)
+        .ilike("matric_no", mat)
         .order("level", { ascending: true })
         .order("semester", { ascending: true });
-      if (error) throw error;
-      return data ?? [];
+
+      if (exactData && exactData.length > 0) return exactData;
+
+      const { data: allGrades } = await supabase
+        .from("grades")
+        .select("*")
+        .order("level", { ascending: true })
+        .order("semester", { ascending: true });
+
+      if (!allGrades) return [];
+
+      const matClean = mat.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+      return allGrades.filter((g: any) => {
+        const gClean = (g.matric_no ?? "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        return gClean === matClean || (matClean.length >= 4 && gClean.includes(matClean));
+      });
     },
   });
 
