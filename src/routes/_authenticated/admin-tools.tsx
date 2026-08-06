@@ -6,7 +6,7 @@ import { useCurrentUser } from "@/lib/use-current-user";
 import { AppNav, PageHeader } from "@/components/AppNav";
 import { Icon3d } from "@/components/Icon3d";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, Upload, Sparkles, FileSpreadsheet } from "lucide-react";
+import { Loader2, Plus, Trash2, Upload, Sparkles, FileSpreadsheet, CheckCircle2, XCircle, Clock, FileCheck } from "lucide-react";
 import { runAndSaveStudentPrediction } from "@/lib/ai-warning-system";
 
 export const Route = createFileRoute("/_authenticated/admin-tools")({
@@ -48,97 +48,80 @@ function AdminToolsPage() {
           .in("id", ids);
         for (const p of profs ?? []) profileMap.set(p.id, { full_name: p.full_name, email: p.email });
       }
-      return (roles ?? []).map((r) => ({ ...r, profile: profileMap.get(r.user_id) ?? null }));
+
+      return (roles ?? []).map((r) => ({
+        id: r.id,
+        role: r.role,
+        profile: profileMap.get(r.user_id),
+      }));
     },
   });
 
-  // Grade Entry & AI Risk Execution Mutation
-  const addGradeAndRunAI = useMutation({
+  const pendingSubmissionsQ = useQuery({
+    queryKey: ["admin-pending-submissions"],
+    enabled: !!isAdmin,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("result_submissions")
+        .select("*")
+        .order("submitted_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const recordGrade = useMutation({
     mutationFn: async () => {
       const mat = matricNo.trim().toUpperCase();
       const code = courseCode.trim().toUpperCase();
       const title = courseTitle.trim() || code;
-      const sc = Number(score);
-      const cu = Number(creditUnits);
-      const lvl = Number(level);
-      const sem = Number(semester);
+      const numScore = Number(score) || 0;
+      const numCu = Number(creditUnits) || 3;
+      const numLvl = Number(level) || 100;
+      const numSem = Number(semester) || 1;
 
-      if (!mat || !code || isNaN(sc) || isNaN(cu)) {
-        throw new Error("Please fill out all required grade fields");
-      }
+      if (!mat || !code) throw new Error("Enter matric number and course code");
 
-      // Calculate Grade & Grade Point (5.0 Scale)
-      let grade = "F";
-      let gp = 0;
-      if (sc >= 70) { grade = "A"; gp = 5; }
-      else if (sc >= 60) { grade = "B"; gp = 4; }
-      else if (sc >= 50) { grade = "C"; gp = 3; }
-      else if (sc >= 45) { grade = "D"; gp = 2; }
-      else if (sc >= 40) { grade = "E"; gp = 1; }
-      else { grade = "F"; gp = 0; }
+      const gradeInfo = computeGrade(numScore);
+      const wp = gradeInfo.point * numCu;
 
-      const wp = gp * cu;
+      // 1. Insert grade into grades table
+      const { error: gErr } = await supabase.from("grades").upsert({
+        matric_no: mat,
+        course_code: code,
+        course_title: title,
+        score: numScore,
+        grade: gradeInfo.grade,
+        credit_units: numCu,
+        weighted_point: wp,
+        level: numLvl,
+        semester: numSem,
+        status: "APPROVED"
+      });
+      if (gErr) throw gErr;
 
-      // 1. Ensure Student Record exists
+      // 2. Fetch all grades for this student and compute CGPA
+      const { data: allGrades, error: fetchErr } = await supabase
+        .from("grades")
+        .select("credit_units, weighted_point")
+        .eq("matric_no", mat);
+      if (fetchErr) throw fetchErr;
+
+      const totalCU = (allGrades ?? []).reduce((sum, g) => sum + Number(g.credit_units || 0), 0);
+      const totalWP = (allGrades ?? []).reduce((sum, g) => sum + Number(g.weighted_point || 0), 0);
+      const newCgpa = totalCU > 0 ? Number((totalWP / totalCU).toFixed(2)) : 0;
+      const { classification, status } = getCgpaClassification(newCgpa);
+
+      // 3. Upsert cumulative CGPA summary
       const { data: student } = await supabase
         .from("students")
         .select("student_name")
         .eq("matric_no", mat)
         .maybeSingle();
 
-      if (!student) {
-        await supabase.from("students").insert({
-          matric_no: mat,
-          student_name: `Student (${mat})`,
-          level: lvl,
-          department: "Software Engineering",
-          programme: "B.Sc. Software Engineering"
-        });
-      }
-
-      // 2. Insert Grade Record
-      const { error: gErr } = await supabase.from("grades").insert({
-        matric_no: mat,
-        course_code: code,
-        course_title: title,
-        level: lvl,
-        semester: sem,
-        score: sc,
-        grade,
-        grade_point: gp,
-        credit_units: cu,
-        weighted_point: wp,
-        student_name: student?.student_name ?? `Student (${mat})`
-      });
-
-      if (gErr) throw gErr;
-
-      // 3. Recalculate CGPA Summary for Student
-      const { data: allGrades } = await supabase
-        .from("grades")
-        .select("credit_units, weighted_point")
-        .eq("matric_no", mat);
-
-      const totalCU = (allGrades ?? []).reduce((a, r) => a + r.credit_units, 0);
-      const totalWP = (allGrades ?? []).reduce((a, r) => a + r.weighted_point, 0);
-      const newCgpa = totalCU > 0 ? Number((totalWP / totalCU).toFixed(2)) : 0;
-
-      let classification: any = "Third Class";
-      let status: any = "AVERAGE";
-
-      if (newCgpa >= 4.50) classification = "First Class";
-      else if (newCgpa >= 3.50) classification = "Second Class Upper";
-      else if (newCgpa >= 2.40) classification = "Second Class Lower";
-      else if (newCgpa >= 1.50) classification = "Third Class";
-      else classification = "Fail";
-
-      if (newCgpa >= 3.50) status = "ABOVE AVERAGE";
-      else if (newCgpa >= 2.50) status = "AVERAGE";
-      else status = "BELOW AVERAGE";
-
       await supabase.from("cgpa_summary").upsert({
         matric_no: mat,
-        level: lvl,
+        level: numLvl,
         total_credit_units: totalCU,
         total_weighted_points: totalWP,
         cgpa: newCgpa,
@@ -161,6 +144,89 @@ function AdminToolsPage() {
       qc.invalidateQueries();
     },
     onError: (e: any) => toast.error(e.message || "Failed to record grade"),
+  });
+
+  const approveSubmissionMutation = useMutation({
+    mutationFn: async (sub: any) => {
+      const courses = Array.isArray(sub.courses_json) ? sub.courses_json : [];
+      if (courses.length === 0) throw new Error("Submission has no course entries");
+
+      // 1. Insert/Upsert into grades table
+      for (const c of courses) {
+        const scoreVal = Number(c.score) || 0;
+        const cuVal = Number(c.cu) || 3;
+        const gInfo = computeGrade(scoreVal);
+        const wp = gInfo.point * cuVal;
+
+        await supabase.from("grades").upsert({
+          matric_no: sub.matric_no,
+          course_code: c.code.trim().toUpperCase(),
+          course_title: c.title.trim() || c.code,
+          score: scoreVal,
+          grade: gInfo.grade,
+          credit_units: cuVal,
+          weighted_point: wp,
+          level: Number(sub.level),
+          semester: Number(sub.semester),
+          status: "APPROVED"
+        });
+      }
+
+      // 2. Compute cumulative CGPA
+      const { data: allGrades } = await supabase
+        .from("grades")
+        .select("credit_units, weighted_point")
+        .eq("matric_no", sub.matric_no);
+
+      const totalCU = (allGrades ?? []).reduce((sum: number, g: any) => sum + Number(g.credit_units || 0), 0);
+      const totalWP = (allGrades ?? []).reduce((sum: number, g: any) => sum + Number(g.weighted_point || 0), 0);
+      const newCgpa = totalCU > 0 ? Number((totalWP / totalCU).toFixed(2)) : 0;
+      const { classification, status } = getCgpaClassification(newCgpa);
+
+      await supabase.from("cgpa_summary").upsert({
+        matric_no: sub.matric_no,
+        level: Number(sub.level),
+        total_credit_units: totalCU,
+        total_weighted_points: totalWP,
+        cgpa: newCgpa,
+        classification,
+        status,
+        student_name: sub.student_name || `Student (${sub.matric_no})`,
+        last_updated: new Date().toISOString()
+      });
+
+      // 3. Trigger AI Predictions
+      await runAndSaveStudentPrediction(sub.matric_no);
+
+      // 4. Mark submission as APPROVED
+      const { error: subErr } = await supabase
+        .from("result_submissions")
+        .update({ status: "APPROVED", reviewed_at: new Date().toISOString() })
+        .eq("id", sub.id);
+
+      if (subErr) throw subErr;
+      return { matric: sub.matric_no, newCgpa };
+    },
+    onSuccess: (res) => {
+      toast.success(`Approved result for ${res.matric}! CGPA updated: ${res.newCgpa.toFixed(2)}`);
+      qc.invalidateQueries();
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to approve submission"),
+  });
+
+  const rejectSubmissionMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: number; notes?: string }) => {
+      const { error } = await supabase
+        .from("result_submissions")
+        .update({ status: "REJECTED", admin_notes: notes || "Rejected by admin", reviewed_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Submission rejected");
+      qc.invalidateQueries();
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to reject submission"),
   });
 
   const grant = useMutation({
@@ -223,7 +289,7 @@ function AdminToolsPage() {
         <PageHeader
           eyebrow="Admin"
           title="Grade Management & AI Tools"
-          subtitle="Record grades, trigger automated CGPA computation, and launch AI Risk Assessment."
+          subtitle="Record grades, review student result submissions, and launch AI Risk Assessment."
           icon={<Icon3d name="gear" size={64} />}
         />
 
@@ -231,44 +297,87 @@ function AdminToolsPage() {
           <NotAllowed />
         ) : (
           <>
+            {/* PENDING STUDENT RESULT APPROVALS QUEUE */}
+            <section className="mt-8 card-elevated rounded-3xl p-6 md:p-8 border border-primary/30 bg-primary/5">
+              <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                <FileCheck className="size-5 text-primary" />
+                <span>Pending Student Result Approvals Queue</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Results uploaded by students from their portal requiring Admin Verification &amp; CGPA Computation.
+              </p>
+
+              <div className="mt-6">
+                {pendingSubmissionsQ.isLoading ? (
+                  <div className="flex items-center gap-2 p-6 text-xs text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" /> Loading pending submissions…
+                  </div>
+                ) : (pendingSubmissionsQ.data ?? []).filter((s: any) => s.status === "PENDING").length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-border/80 p-8 text-center text-xs text-muted-foreground">
+                    No pending student result submissions awaiting approval.
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {(pendingSubmissionsQ.data ?? [])
+                      .filter((s: any) => s.status === "PENDING")
+                      .map((sub: any) => {
+                        const courses = Array.isArray(sub.courses_json) ? sub.courses_json : [];
+                        return (
+                          <div key={sub.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="text-sm font-bold text-foreground">{sub.student_name || sub.matric_no}</h4>
+                                <div className="text-xs font-mono text-muted-foreground">Matric: {sub.matric_no}</div>
+                              </div>
+                              <span className="rounded-full bg-warning/15 px-2.5 py-0.5 text-[11px] font-semibold text-warning">
+                                Level {sub.level} · Sem {sub.semester}
+                              </span>
+                            </div>
+
+                            <div className="mt-3 space-y-1 max-h-36 overflow-y-auto rounded-xl bg-accent/30 p-2.5 text-xs font-mono">
+                              {courses.map((c: any, idx: number) => (
+                                <div key={idx} className="flex justify-between border-b border-border/40 pb-1 last:border-0">
+                                  <span>{c.code} ({c.cu} CU)</span>
+                                  <span className="font-bold">{c.score} Marks</span>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="mt-4 flex gap-2">
+                              <button
+                                onClick={() => approveSubmissionMutation.mutate(sub)}
+                                disabled={approveSubmissionMutation.isPending}
+                                className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-success px-4 py-2 text-xs font-semibold text-white hover:opacity-90 transition disabled:opacity-60 shadow-sm"
+                              >
+                                {approveSubmissionMutation.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <CheckCircle2 className="size-3.5" />}
+                                Approve &amp; Compute CGPA
+                              </button>
+
+                              <button
+                                onClick={() => rejectSubmissionMutation.mutate({ id: sub.id })}
+                                disabled={rejectSubmissionMutation.isPending}
+                                className="flex items-center justify-center gap-1 rounded-full bg-secondary px-3 py-2 text-xs font-medium text-destructive hover:bg-destructive/10 transition"
+                              >
+                                <XCircle className="size-3.5" /> Reject
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            </section>
+
             {/* Grade Upload & AI Workflow Tool */}
             <section className="mt-8 card-elevated rounded-3xl p-6 md:p-8 border border-primary/20 bg-surface/80">
               <div className="flex items-center gap-2 text-sm font-semibold text-primary">
                 <FileSpreadsheet className="size-4" />
-                <span>Grade Entry & Automated AI Warning Workflow</span>
+                <span>Manual Grade Entry &amp; Direct Admin Upload</span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Grades Uploaded → Calculate CGPA → Predict Risk & Next GPA → Generate Recommendations → Save Prediction → Auto-Refer High Risk
+                Grades Uploaded → Calculate CGPA → Predict Risk &amp; Next GPA → Generate Recommendations → Save Prediction → Auto-Refer High Risk
               </p>
-
-              {/* Bulk Grade Upload Box */}
-              <div className="mt-6 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 p-6 text-center">
-                <div className="flex flex-col items-center gap-2">
-                  <Upload className="size-8 text-primary" />
-                  <span className="text-sm font-semibold">Bulk Upload Grade Sheet (.CSV / .XLSX)</span>
-                  <span className="text-xs text-muted-foreground">
-                    Required Columns: MatricNo, CourseCode, CourseTitle, Score, CreditUnits, Level, Semester
-                  </span>
-                  <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition">
-                    <FileSpreadsheet className="size-4" /> Choose CSV Grade File
-                    <input
-                      type="file"
-                      accept=".csv,.xlsx"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          toast.success(`Processing grade sheet: ${file.name}`);
-                          setTimeout(() => {
-                            toast.success("Batch grades processed & AI predictions generated!");
-                            qc.invalidateQueries();
-                          }, 1200);
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
 
               <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
@@ -286,8 +395,8 @@ function AdminToolsPage() {
                   <input
                     value={courseCode}
                     onChange={(e) => setCourseCode(e.target.value)}
-                    placeholder="e.g. SWE 301"
-                    className="mt-1 w-full rounded-2xl border border-border bg-surface/90 px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40"
+                    placeholder="e.g. SEN 301"
+                    className="mt-1 w-full rounded-2xl border border-border bg-surface/90 px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 uppercase"
                   />
                 </div>
 
@@ -296,87 +405,93 @@ function AdminToolsPage() {
                   <input
                     value={courseTitle}
                     onChange={(e) => setCourseTitle(e.target.value)}
-                    placeholder="e.g. Software Architecture"
+                    placeholder="Software Engineering"
                     className="mt-1 w-full rounded-2xl border border-border bg-surface/90 px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Score (0–100) *</label>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Score (0 - 100) *</label>
                   <input
                     type="number"
                     value={score}
                     onChange={(e) => setScore(e.target.value)}
-                    placeholder="70"
                     className="mt-1 w-full rounded-2xl border border-border bg-surface/90 px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40"
                   />
                 </div>
 
                 <div>
                   <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Credit Units *</label>
-                  <input
-                    type="number"
+                  <select
                     value={creditUnits}
                     onChange={(e) => setCreditUnits(e.target.value)}
-                    placeholder="3"
-                    className="mt-1 w-full rounded-2xl border border-border bg-surface/90 px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Level</label>
-                  <select
-                    value={level}
-                    onChange={(e) => setLevel(e.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-border bg-surface/90 px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40"
+                    className="mt-1 w-full rounded-2xl border border-border bg-surface/90 px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
                   >
-                    <option value="100">Level 100</option>
-                    <option value="200">Level 200</option>
-                    <option value="300">Level 300</option>
-                    <option value="400">Level 400</option>
-                    <option value="500">Level 500</option>
+                    <option value="1">1 Credit Unit</option>
+                    <option value="2">2 Credit Units</option>
+                    <option value="3">3 Credit Units</option>
+                    <option value="4">4 Credit Units</option>
+                    <option value="6">6 Credit Units</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Semester</label>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Level *</label>
+                  <select
+                    value={level}
+                    onChange={(e) => setLevel(e.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-border bg-surface/90 px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
+                  >
+                    <option value="100">100 Level</option>
+                    <option value="200">200 Level</option>
+                    <option value="300">300 Level</option>
+                    <option value="400">400 Level</option>
+                    <option value="500">500 Level</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Semester *</label>
                   <select
                     value={semester}
                     onChange={(e) => setSemester(e.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-border bg-surface/90 px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40"
+                    className="mt-1 w-full rounded-2xl border border-border bg-surface/90 px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
                   >
-                    <option value="1">Semester 1</option>
-                    <option value="2">Semester 2</option>
+                    <option value="1">1st Semester</option>
+                    <option value="2">2nd Semester</option>
                   </select>
                 </div>
 
                 <div className="flex items-end">
                   <button
-                    onClick={() => addGradeAndRunAI.mutate()}
-                    disabled={addGradeAndRunAI.isPending}
-                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition disabled:opacity-60"
+                    onClick={() => recordGrade.mutate()}
+                    disabled={recordGrade.isPending}
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition disabled:opacity-60 shadow-sm"
                   >
-                    {addGradeAndRunAI.isPending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-                    Record Grade & Execute AI
+                    {recordGrade.isPending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                    Save Grade &amp; Compute CGPA
                   </button>
                 </div>
               </div>
             </section>
+
+            {/* Role Grant Section */}
             <section className="mt-8 card-elevated rounded-3xl p-6 md:p-8">
-              <h3 className="text-sm font-semibold">Grant a role</h3>
-              <p className="mt-1 text-[13px] text-muted-foreground">User must already have an account.</p>
-              <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
+              <h3 className="text-lg font-semibold tracking-tight">Assign user role</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Promote registered users to Counselor or Administrator permissions.</p>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3">
                 <input
+                  type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="user@email.com"
-                  type="email"
-                  className="rounded-full border border-border bg-surface/60 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="User email address…"
+                  className="flex-1 rounded-2xl border border-border bg-surface/90 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/40 min-w-[240px]"
                 />
                 <select
                   value={role}
-                  onChange={(e) => setRole(e.target.value as any)}
-                  className="rounded-full border border-border bg-surface/60 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+                  onChange={(e: any) => setRole(e.target.value)}
+                  className="rounded-2xl border border-border bg-surface/90 px-4 py-2.5 text-sm outline-none font-medium"
                 >
                   <option value="student">student</option>
                   <option value="counselor">counselor</option>
@@ -385,9 +500,9 @@ function AdminToolsPage() {
                 <button
                   onClick={() => grant.mutate()}
                   disabled={grant.isPending}
-                  className="flex items-center justify-center gap-1.5 rounded-full bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+                  className="flex items-center justify-center gap-1.5 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60 shadow-sm"
                 >
-                  {grant.isPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Grant
+                  {grant.isPending ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Grant Role
                 </button>
               </div>
             </section>
@@ -440,6 +555,23 @@ function AdminToolsPage() {
       </main>
     </div>
   );
+}
+
+function computeGrade(score: number) {
+  if (score >= 70) return { grade: "A", point: 5 };
+  if (score >= 60) return { grade: "B", point: 4 };
+  if (score >= 50) return { grade: "C", point: 3 };
+  if (score >= 45) return { grade: "D", point: 2 };
+  if (score >= 40) return { grade: "E", point: 1 };
+  return { grade: "F", point: 0 };
+}
+
+function getCgpaClassification(cgpa: number) {
+  if (cgpa >= 4.5) return { classification: "First Class", status: "GOOD_STANDING" };
+  if (cgpa >= 3.5) return { classification: "Second Class Upper", status: "GOOD_STANDING" };
+  if (cgpa >= 2.4) return { classification: "Second Class Lower", status: "GOOD_STANDING" };
+  if (cgpa >= 1.5) return { classification: "Third Class", status: "ACADEMIC_WARNING" };
+  return { classification: "Pass / Probation", status: "PROBATION" };
 }
 
 function NotAllowed() {
