@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Mail, IdCard } from "lucide-react";
+import { Loader2, Mail, IdCard, GraduationCap } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   component: ProfilePage,
@@ -17,13 +17,7 @@ function ProfilePage() {
   const { data: me } = useCurrentUser();
   const [fullName, setFullName] = useState("");
   const [matric, setMatric] = useState("");
-
-  useEffect(() => {
-    if (me) {
-      setFullName(me.fullName ?? "");
-      setMatric(me.matricNo ?? "");
-    }
-  }, [me]);
+  const [level, setLevel] = useState("100");
 
   const studentQ = useQuery({
     queryKey: ["my-student", me?.matricNo],
@@ -34,20 +28,48 @@ function ProfilePage() {
     },
   });
 
+  useEffect(() => {
+    if (me) {
+      setFullName(me.fullName ?? "");
+      setMatric(me.matricNo ?? "");
+    }
+    if (studentQ.data) {
+      setLevel(String(studentQ.data.level ?? 100));
+    }
+  }, [me, studentQ.data]);
+
   const save = useMutation({
     mutationFn: async () => {
       if (!me) return;
-      const { error } = await supabase
+      const formattedMatric = matric.trim().toUpperCase() || me.matricNo || `2024/${Math.floor(10000 + Math.random() * 90000)}`;
+      const numLevel = Number(level) || 100;
+
+      // 1. Update Profile in Supabase
+      const { error: pErr } = await supabase
         .from("profiles")
-        .update({ full_name: fullName, matric_no: matric.trim().toUpperCase() || null })
+        .update({ full_name: fullName, matric_no: formattedMatric })
         .eq("id", me.userId);
-      if (error) throw error;
+
+      if (pErr) throw pErr;
+
+      // 2. Update Student Level and details in Supabase
+      const { error: sErr } = await supabase.from("students").upsert({
+        matric_no: formattedMatric,
+        student_name: fullName,
+        level: numLevel,
+        department: studentQ.data?.department ?? "Software Engineering",
+        programme: studentQ.data?.programme ?? "B.Sc. Software Engineering"
+      });
+
+      if (sErr) throw sErr;
     },
     onSuccess: () => {
-      toast.success("Profile updated");
+      toast.success("Profile and Academic Level updated successfully!");
       qc.invalidateQueries({ queryKey: ["current-user"] });
+      qc.invalidateQueries({ queryKey: ["my-student"] });
+      qc.invalidateQueries({ queryKey: ["admin-students-ai"] });
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to update profile"),
   });
 
   return (
@@ -62,41 +84,58 @@ function ProfilePage() {
         />
 
         <section className="mt-8 card-elevated rounded-3xl p-6 md:p-8">
-          <h3 className="text-base font-semibold">Personal details</h3>
-          <p className="text-sm text-muted-foreground">Your name and matric link your account to your academic record.</p>
+          <h3 className="text-base font-semibold">Personal &amp; Academic details</h3>
+          <p className="text-sm text-muted-foreground">Manage your full name, matric number, and academic level.</p>
 
           <div className="mt-6 grid gap-4">
             <Field label="Full name" value={fullName} onChange={setFullName} />
-            <Field label="Matric number" value={matric} onChange={setMatric} placeholder="e.g. CSC/2020/001" />
-            <ReadOnly label="Email" value={me?.email ?? ""} icon={<Mail className="size-4" />} />
-            <ReadOnly label="Role" value={me?.primaryRole ?? "—"} icon={<IdCard className="size-4" />} />
+            <Field label="Matric number" value={matric} onChange={setMatric} placeholder="e.g. 2024/58720" />
+            
+            {/* Editable Level Dropdown */}
+            <div>
+              <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Academic Level</label>
+              <select
+                value={level}
+                onChange={(e) => setLevel(e.target.value)}
+                className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none focus:ring-focus font-medium"
+              >
+                <option value="100">100 Level</option>
+                <option value="200">200 Level</option>
+                <option value="300">300 Level</option>
+                <option value="400">400 Level</option>
+                <option value="500">500 Level</option>
+              </select>
+            </div>
+
+            <ReadOnly label="Email address" value={me?.email ?? ""} icon={<Mail className="size-4" />} />
+            <ReadOnly label="Assigned Role" value={me?.primaryRole ?? "student"} icon={<IdCard className="size-4" />} />
           </div>
 
           <div className="mt-6">
             <button
               onClick={() => save.mutate()}
               disabled={save.isPending}
-              className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-60 transition"
             >
               {save.isPending && <Loader2 className="size-4 animate-spin" />}
-              Save changes
+              Save Profile Changes
             </button>
           </div>
         </section>
 
         {me?.matricNo && (
           <section className="mt-6 card-elevated rounded-3xl p-6 md:p-8">
-            <h3 className="text-base font-semibold">Student record</h3>
+            <h3 className="text-base font-semibold">Live Academic Record Summary</h3>
             {studentQ.isLoading ? (
-              <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Loading…</div>
+              <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Loading record...</div>
             ) : !studentQ.data ? (
-              <p className="mt-2 text-sm text-muted-foreground">No matching student row.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Registered as student ({me.matricNo}).</p>
             ) : (
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <Pair label="Programme" value={studentQ.data.programme} />
                 <Pair label="Department" value={studentQ.data.department} />
-                <Pair label="Current level" value={String(studentQ.data.level)} />
-                <Pair label="Matric no." value={studentQ.data.matric_no} />
+                <Pair label="Academic Level" value={`Level ${level}`} />
+                <Pair label="Matriculation No." value={studentQ.data.matric_no} />
               </div>
             )}
           </section>
@@ -114,11 +153,12 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none focus:ring-focus"
+        className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none focus:ring-focus font-medium"
       />
     </label>
   );
 }
+
 function ReadOnly({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
     <div>
@@ -129,11 +169,12 @@ function ReadOnly({ label, value, icon }: { label: string; value: string; icon?:
     </div>
   );
 }
+
 function Pair({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-border bg-surface/60 px-4 py-3">
       <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-sm font-medium">{value}</div>
+      <div className="mt-0.5 text-sm font-semibold text-foreground">{value}</div>
     </div>
   );
 }

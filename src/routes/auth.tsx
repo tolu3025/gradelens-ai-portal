@@ -23,6 +23,7 @@ function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [matric, setMatric] = useState("");
+  const [level, setLevel] = useState("100");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -37,21 +38,23 @@ function AuthPage() {
     try {
       if (mode === "signup") {
         const formattedMatric = matric.trim().toUpperCase() || `2024/${Math.floor(10000 + Math.random() * 90000)}`;
+        const selectedLevel = Number(level) || 100;
+
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin + "/dashboard",
-            data: { full_name: fullName, matric_no: formattedMatric },
+            data: { full_name: fullName, matric_no: formattedMatric, level: selectedLevel },
           },
         });
         if (error) throw error;
 
-        // Upsert student record into Supabase students table so total student count increments
+        // Upsert student record into Supabase students table with Level and Matric number
         await supabase.from("students").upsert({
           matric_no: formattedMatric,
           student_name: fullName || email.split("@")[0],
-          level: 100,
+          level: selectedLevel,
           department: "Software Engineering",
           programme: "B.Sc. Software Engineering"
         });
@@ -82,7 +85,7 @@ function AuthPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               {mode === "signin"
                 ? "Sign in to access your Grade Lens portal."
-                : "Students: enter your matric number to link your record."}
+                : "Students: enter your full name, level, and matric number."}
             </p>
           </div>
 
@@ -98,6 +101,20 @@ function AuthPage() {
                     placeholder="Jane Doe"
                     className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-transparent focus:ring-focus"
                   />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Academic Level *</label>
+                  <select
+                    value={level}
+                    onChange={(e) => setLevel(e.target.value)}
+                    className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none focus:border-transparent focus:ring-focus"
+                  >
+                    <option value="100">100 Level</option>
+                    <option value="200">200 Level</option>
+                    <option value="300">300 Level</option>
+                    <option value="400">400 Level</option>
+                    <option value="500">500 Level</option>
+                  </select>
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Matric No. (Format: e.g. 2024/58720)</label>
