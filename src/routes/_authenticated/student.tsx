@@ -20,6 +20,7 @@ function StudentPage() {
 
   // Profile prompt update state
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const [fullNameInput, setFullNameInput] = useState("");
   const [matricInput, setMatricInput] = useState("");
   const [levelInput, setLevelInput] = useState("100");
@@ -110,6 +111,7 @@ function StudentPage() {
     onSuccess: () => {
       toast.success("Academic details verified & updated successfully!");
       setShowUpdateModal(false);
+      setBannerDismissed(true);
       qc.invalidateQueries();
     },
     onError: (e: any) => toast.error(e.message || "Failed to update profile"),
@@ -187,102 +189,104 @@ function StudentPage() {
       <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 md:pt-12">
 
         {/* PROMPT BANNER FOR ACADEMIC DETAILS VERIFICATION */}
-        <section className="mb-8 card-elevated rounded-3xl p-6 border border-primary/30 bg-primary/5">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/20 text-primary">
-                <UserCheck className="size-5" />
+        {!bannerDismissed && (
+          <section className="mb-8 card-elevated rounded-3xl p-6 border border-primary/30 bg-primary/5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/20 text-primary">
+                  <UserCheck className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold">Verify &amp; Update Your Academic Profile</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Confirm your official Matriculation Number, Academic Level, and Department for AI Warnings &amp; Counseling records.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-semibold">Verify &amp; Update Your Academic Profile</h3>
-                <p className="text-xs text-muted-foreground">
-                  Confirm your official Matriculation Number, Academic Level, and Department for AI Warnings &amp; Counseling records.
-                </p>
-              </div>
+
+              <button
+                onClick={() => setShowUpdateModal((s) => !s)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition shadow-sm"
+              >
+                <Sparkles className="size-3.5" />
+                {showUpdateModal ? "Hide Details Form" : "Enter / Update Correct Details"}
+              </button>
             </div>
 
-            <button
-              onClick={() => setShowUpdateModal((s) => !s)}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition shadow-sm"
-            >
-              <Sparkles className="size-3.5" />
-              {showUpdateModal ? "Hide Details Form" : "Enter / Update Correct Details"}
-            </button>
-          </div>
+            {/* INLINE EDITABLE DETAILS FORM */}
+            {showUpdateModal && (
+              <div className="mt-6 border-t border-primary/20 pt-6">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Full Name *</label>
+                    <input
+                      value={fullNameInput}
+                      onChange={(e) => setFullNameInput(e.target.value)}
+                      placeholder="e.g. Ayinoluwa Ifeoluwa"
+                      className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
+                    />
+                  </div>
 
-          {/* INLINE EDITABLE DETAILS FORM */}
-          {showUpdateModal && (
-            <div className="mt-6 border-t border-primary/20 pt-6">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Full Name *</label>
-                  <input
-                    value={fullNameInput}
-                    onChange={(e) => setFullNameInput(e.target.value)}
-                    placeholder="e.g. Ayinoluwa Ifeoluwa"
-                    className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
-                  />
-                </div>
+                  <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Matriculation No. *</label>
+                    <input
+                      value={matricInput}
+                      onChange={(e) => setMatricInput(e.target.value)}
+                      placeholder="e.g. 2024/11705"
+                      className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
+                    />
+                  </div>
 
-                <div>
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Matriculation No. *</label>
-                  <input
-                    value={matricInput}
-                    onChange={(e) => setMatricInput(e.target.value)}
-                    placeholder="e.g. 2024/11705"
-                    className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
-                  />
-                </div>
+                  <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Academic Level *</label>
+                    <select
+                      value={levelInput}
+                      onChange={(e) => setLevelInput(e.target.value)}
+                      className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
+                    >
+                      <option value="100">100 Level</option>
+                      <option value="200">200 Level</option>
+                      <option value="300">300 Level</option>
+                      <option value="400">400 Level</option>
+                      <option value="500">500 Level</option>
+                    </select>
+                  </div>
 
-                <div>
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Academic Level *</label>
-                  <select
-                    value={levelInput}
-                    onChange={(e) => setLevelInput(e.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
-                  >
-                    <option value="100">100 Level</option>
-                    <option value="200">200 Level</option>
-                    <option value="300">300 Level</option>
-                    <option value="400">400 Level</option>
-                    <option value="500">500 Level</option>
-                  </select>
-                </div>
+                  <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Department</label>
+                    <input
+                      value={departmentInput}
+                      onChange={(e) => setDepartmentInput(e.target.value)}
+                      placeholder="Software Engineering"
+                      className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
+                    />
+                  </div>
 
-                <div>
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Department</label>
-                  <input
-                    value={departmentInput}
-                    onChange={(e) => setDepartmentInput(e.target.value)}
-                    placeholder="Software Engineering"
-                    className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
-                  />
-                </div>
+                  <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Programme</label>
+                    <input
+                      value={programmeInput}
+                      onChange={(e) => setProgrammeInput(e.target.value)}
+                      placeholder="B.Sc. Software Engineering"
+                      className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
+                    />
+                  </div>
 
-                <div>
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Programme</label>
-                  <input
-                    value={programmeInput}
-                    onChange={(e) => setProgrammeInput(e.target.value)}
-                    placeholder="B.Sc. Software Engineering"
-                    className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
-                  />
-                </div>
-
-                <div className="flex items-end">
-                  <button
-                    onClick={() => updateProfileMutation.mutate()}
-                    disabled={updateProfileMutation.isPending}
-                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition disabled:opacity-60"
-                  >
-                    {updateProfileMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                    Save &amp; Update Record
-                  </button>
+                  <div className="flex items-end">
+                    <button
+                      onClick={() => updateProfileMutation.mutate()}
+                      disabled={updateProfileMutation.isPending}
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition disabled:opacity-60"
+                    >
+                      {updateProfileMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                      Save &amp; Update Record
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </section>
+            )}
+          </section>
+        )}
 
         {!activeMatric ? (
           <EmptyState title="Please verify your Matriculation Number above" desc="Enter your official matriculation number in the form above to display your CGPA and grades." />
