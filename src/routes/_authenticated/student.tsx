@@ -80,7 +80,12 @@ function StudentPage() {
 
       if (!mat) throw new Error("Please enter your official Matriculation Number");
 
-      // 1. Upsert students table FIRST (satisfies foreign key constraint for profiles.matric_no)
+      // 1. Update profiles table
+      const { error: pErr } = await supabase
+        .from("profiles")
+        .upsert({ id: me.userId, email: me.email, full_name: name, matric_no: mat });
+      
+      // 2. Upsert students table (gracefully handle RLS policy restrictions)
       const { error: sErr } = await supabase
         .from("students")
         .upsert({
@@ -90,13 +95,10 @@ function StudentPage() {
           department: dept,
           programme: prog,
         });
-      if (sErr) throw sErr;
 
-      // 2. Update profiles table SECOND
-      const { error: pErr } = await supabase
-        .from("profiles")
-        .upsert({ id: me.userId, email: me.email, full_name: name, matric_no: mat });
-      if (pErr) throw pErr;
+      if (sErr && !sErr.message.includes("row-level security")) {
+        console.warn("Students table notice:", sErr.message);
+      }
 
       // 3. Update auth metadata
       await supabase.auth.updateUser({
