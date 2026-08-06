@@ -416,6 +416,30 @@ function StudentPage() {
               matric={activeMatric}
             />
 
+            {/* PROMINENT RESULT UPLOAD CALLOUT BANNER */}
+            <section className="mt-6 rounded-3xl p-6 border border-primary/30 bg-primary/10 card-elevated">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+                    <Upload className="size-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-foreground">Submit Printed Portal Result</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Upload/submit your printed semester results here for Admin Approval &amp; automated CGPA calculation.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowUploadModal(true)}
+                  className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-lg"
+                >
+                  <Upload className="size-4" /> Submit Printed Result Now
+                </button>
+              </div>
+            </section>
+
             {/* PENDING RESULT SUBMISSIONS SECTION */}
             {(submissionsQ.data?.length ?? 0) > 0 && (
               <section className="mt-8">
