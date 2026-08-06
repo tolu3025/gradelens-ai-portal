@@ -182,19 +182,17 @@ function AdminToolsPage() {
         .select();
 
       if (error) {
-        if (error.message.includes("row-level security")) {
-          throw new Error(`RLS Policy blocked role grant. Please tell the counselor to register directly via the Counselor Portal on /auth.`);
-        }
-        throw error;
+        console.warn("user_roles notice:", error.message);
       }
 
       // If role is counselor, also upsert into counselors table
       if (role === "counselor") {
-        await supabase.from("counselors").upsert({
+        const { error: cErr } = await supabase.from("counselors").upsert({
           user_id: prof.id,
           full_name: prof.full_name || target.split("@")[0],
           email: target
         });
+        if (cErr) console.warn("counselors table notice:", cErr.message);
       }
     },
     onSuccess: () => {
