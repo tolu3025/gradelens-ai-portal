@@ -44,15 +44,7 @@ function ProfilePage() {
       const formattedMatric = matric.trim().toUpperCase() || me.matricNo || `2024/${Math.floor(10000 + Math.random() * 90000)}`;
       const numLevel = Number(level) || 100;
 
-      // 1. Update Profile in Supabase
-      const { error: pErr } = await supabase
-        .from("profiles")
-        .update({ full_name: fullName, matric_no: formattedMatric })
-        .eq("id", me.userId);
-
-      if (pErr) throw pErr;
-
-      // 2. Update Student Level and details in Supabase
+      // 1. Update Student Level and details in Supabase FIRST (satisfies foreign key constraint for profiles.matric_no)
       const { error: sErr } = await supabase.from("students").upsert({
         matric_no: formattedMatric,
         student_name: fullName,
@@ -62,6 +54,14 @@ function ProfilePage() {
       });
 
       if (sErr) throw sErr;
+
+      // 2. Update Profile in Supabase SECOND
+      const { error: pErr } = await supabase
+        .from("profiles")
+        .update({ full_name: fullName, matric_no: formattedMatric })
+        .eq("id", me.userId);
+
+      if (pErr) throw pErr;
     },
     onSuccess: () => {
       toast.success("Profile and Academic Level updated successfully!");

@@ -80,13 +80,7 @@ function StudentPage() {
 
       if (!mat) throw new Error("Please enter your official Matriculation Number");
 
-      // 1. Update profiles table
-      const { error: pErr } = await supabase
-        .from("profiles")
-        .upsert({ id: me.userId, email: me.email, full_name: name, matric_no: mat });
-      if (pErr) throw pErr;
-
-      // 2. Upsert students table
+      // 1. Upsert students table FIRST (satisfies foreign key constraint for profiles.matric_no)
       const { error: sErr } = await supabase
         .from("students")
         .upsert({
@@ -97,6 +91,12 @@ function StudentPage() {
           programme: prog,
         });
       if (sErr) throw sErr;
+
+      // 2. Update profiles table SECOND
+      const { error: pErr } = await supabase
+        .from("profiles")
+        .upsert({ id: me.userId, email: me.email, full_name: name, matric_no: mat });
+      if (pErr) throw pErr;
 
       // 3. Update auth metadata
       await supabase.auth.updateUser({
