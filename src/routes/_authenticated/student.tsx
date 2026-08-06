@@ -118,6 +118,7 @@ function StudentPage() {
   });
 
   const activeMatric = studentDbQ.data?.activeMatric || matric;
+  const isProfileComplete = !!(studentDbQ.data?.prof?.matric_no || studentDbQ.data?.student?.matric_no);
 
   const cgpaQ = useQuery({
     queryKey: ["cgpa", activeMatric],
@@ -188,8 +189,8 @@ function StudentPage() {
       <AppNav role="student" name={me?.fullName ?? undefined} />
       <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 md:pt-12">
 
-        {/* PROMPT BANNER FOR ACADEMIC DETAILS VERIFICATION */}
-        {!bannerDismissed && (
+        {/* PROMPT BANNER FOR ACADEMIC DETAILS VERIFICATION (Only shown if profile is not yet complete in database) */}
+        {!isProfileComplete && !bannerDismissed && (
           <section className="mb-8 card-elevated rounded-3xl p-6 border border-primary/30 bg-primary/5">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
