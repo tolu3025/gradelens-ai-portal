@@ -2,9 +2,10 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { LogOut, Menu, X } from "lucide-react";
 import { toast } from "sonner";
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Icon3d, type Icon3dName } from "./Icon3d";
 import { useCurrentUser } from "@/lib/use-current-user";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface NavItem {
   to: string;
@@ -17,36 +18,49 @@ export function AppNav({ role: propRole, name: propName }: { role?: "student" | 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
   const { data: me } = useCurrentUser();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        queryClient.setQueryData(["current-user"], null);
+        queryClient.invalidateQueries();
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [queryClient]);
 
   const activeRole = propRole ?? me?.primaryRole ?? null;
   const activeName = propName ?? me?.fullName ?? me?.email ?? undefined;
   const isSignedIn = !!me?.userId;
 
   const items: NavItem[] = [];
-  if (activeRole === "student") {
-    items.push({ to: "/student", label: "Overview", icon: "cap" });
-    items.push({ to: "/my-grades", label: "Grades", icon: "book" });
-    items.push({ to: "/my-referrals", label: "Referrals", icon: "inbox" });
-    items.push({ to: "/trends", label: "Trends", icon: "chart" });
-    items.push({ to: "/counselors", label: "Counselors", icon: "people" });
-  } else if (activeRole === "counselor") {
-    items.push({ to: "/counselor", label: "Referrals", icon: "people" });
-    items.push({ to: "/leaderboard", label: "Leaderboard", icon: "trophy" });
-  } else if (activeRole === "admin") {
-    items.push({ to: "/admin", label: "Overview", icon: "shield" });
-    items.push({ to: "/admin-students", label: "Students", icon: "users" });
-    items.push({ to: "/admin-referrals", label: "Referrals", icon: "inbox" });
-    items.push({ to: "/counselors", label: "Counselors", icon: "people" });
-    items.push({ to: "/leaderboard", label: "Leaderboard", icon: "trophy" });
-    items.push({ to: "/admin-tools", label: "Tools", icon: "gear" });
-  }
-
   if (isSignedIn) {
+    if (activeRole === "student") {
+      items.push({ to: "/student", label: "Overview", icon: "cap" });
+      items.push({ to: "/my-grades", label: "Grades", icon: "book" });
+      items.push({ to: "/my-referrals", label: "Referrals", icon: "inbox" });
+      items.push({ to: "/trends", label: "Trends", icon: "chart" });
+      items.push({ to: "/counselors", label: "Counselors", icon: "people" });
+    } else if (activeRole === "counselor") {
+      items.push({ to: "/counselor", label: "Referrals", icon: "people" });
+      items.push({ to: "/leaderboard", label: "Leaderboard", icon: "trophy" });
+    } else if (activeRole === "admin") {
+      items.push({ to: "/admin", label: "Overview", icon: "shield" });
+      items.push({ to: "/admin-students", label: "Students", icon: "users" });
+      items.push({ to: "/admin-referrals", label: "Referrals", icon: "inbox" });
+      items.push({ to: "/counselors", label: "Counselors", icon: "people" });
+      items.push({ to: "/leaderboard", label: "Leaderboard", icon: "trophy" });
+      items.push({ to: "/admin-tools", label: "Tools", icon: "gear" });
+    }
     items.push({ to: "/profile", label: "Profile", icon: "sparkle" });
   }
 
   async function signOut() {
     await supabase.auth.signOut();
+    queryClient.setQueryData(["current-user"], null);
+    queryClient.removeQueries({ queryKey: ["current-user"] });
+    queryClient.invalidateQueries();
     toast.success("Signed out");
     navigate({ to: "/" });
   }
@@ -59,28 +73,30 @@ export function AppNav({ role: propRole, name: propName }: { role?: "student" | 
           <span className="font-display text-[15px] font-semibold tracking-tight">Grade Lens</span>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
-          {items.map((it) => {
-            const active = pathname.startsWith(it.to);
-            return (
-              <Link
-                key={it.to}
-                to={it.to}
-                className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
-                  active
-                    ? "bg-primary/15 text-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                }`}
-              >
-                <Icon3d name={it.icon} size={18} />
-                {it.label}
-              </Link>
-            );
-          })}
-        </nav>
+        {isSignedIn && (
+          <nav className="hidden items-center gap-1 md:flex">
+            {items.map((it) => {
+              const active = pathname.startsWith(it.to);
+              return (
+                <Link
+                  key={it.to}
+                  to={it.to}
+                  className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
+                    active
+                      ? "bg-primary/15 text-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`}
+                >
+                  <Icon3d name={it.icon} size={18} />
+                  {it.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         <div className="flex items-center gap-2">
-          {activeName && (
+          {isSignedIn && activeName && (
             <span className="hidden max-w-[14ch] truncate text-[13px] text-muted-foreground sm:inline">
               {activeName}
             </span>
@@ -88,14 +104,14 @@ export function AppNav({ role: propRole, name: propName }: { role?: "student" | 
           {isSignedIn ? (
             <button
               onClick={signOut}
-              className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[13px] font-medium hover:bg-accent"
+              className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[13px] font-medium hover:bg-accent transition"
             >
               <LogOut className="size-3.5" /> Sign out
             </button>
           ) : (
             <Link
               to="/auth"
-              className="rounded-full bg-primary px-3.5 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90"
+              className="rounded-full bg-primary px-3.5 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 transition"
             >
               Sign in
             </Link>
