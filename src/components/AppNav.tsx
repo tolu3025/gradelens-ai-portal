@@ -52,8 +52,8 @@ export function AppNav({ role: propRole, name: propName }: { role?: "student" | 
   }
 
   return (
-    <header className="sticky top-0 z-40 px-3 pt-3">
-      <div className="glass mx-auto flex max-w-6xl items-center justify-between rounded-2xl px-3 py-2">
+    <header className="sticky top-0 z-40 px-3 pt-3 bg-background">
+      <div className="bg-card border border-border/80 shadow-sm mx-auto flex max-w-6xl items-center justify-between rounded-2xl px-3 py-2">
         <Link to="/" className="flex items-center gap-2 px-1">
           <Icon3d name="app" size={32} priority />
           <span className="font-display text-[15px] font-semibold tracking-tight">Grade Lens</span>
@@ -113,7 +113,7 @@ export function AppNav({ role: propRole, name: propName }: { role?: "student" | 
       </div>
 
       {isSignedIn && open && (
-        <div className="glass mx-auto mt-2 grid max-w-6xl gap-1 rounded-2xl p-2 md:hidden">
+        <div className="bg-card border border-border shadow-lg mx-auto mt-2 grid max-w-6xl gap-1 rounded-2xl p-2 md:hidden">
           {items.map((it) => (
             <Link
               key={it.to}
