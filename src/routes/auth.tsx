@@ -36,16 +36,26 @@ function AuthPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const mat = matric.trim().toUpperCase();
+        const formattedMatric = matric.trim().toUpperCase() || `2024/${Math.floor(10000 + Math.random() * 90000)}`;
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin + "/dashboard",
-            data: { full_name: fullName, matric_no: mat || null },
+            data: { full_name: fullName, matric_no: formattedMatric },
           },
         });
         if (error) throw error;
+
+        // Upsert student record into Supabase students table so total student count increments
+        await supabase.from("students").upsert({
+          matric_no: formattedMatric,
+          student_name: fullName || email.split("@")[0],
+          level: 100,
+          department: "Software Engineering",
+          programme: "B.Sc. Software Engineering"
+        });
+
         toast.success("Account created successfully!");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
