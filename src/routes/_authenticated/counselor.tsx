@@ -32,13 +32,33 @@ function CounselorPage() {
     queryKey: ["counselor-refs", counselorQ.data?.id],
     enabled: !!counselorQ.data?.id,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const selectQuery = [
+        "*",
+        "students(student_name, department, programme, level)",
+      ].join(", ");
+
+      const { data: refs, error } = await supabase
         .from("counselor_referrals")
-        .select("*, students(student_name, department, programme, level, predictions(risk_level, risk_probability, decision_reason))")
+        .select(selectQuery)
         .eq("counselor_id", counselorQ.data!.id)
         .order("referred_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      if (!refs) return [];
+
+      // Load predictions separately for each student
+      const enriched = await Promise.all(
+        refs.map(async (r: any) => {
+          const { data: preds } = await supabase
+            .from("predictions")
+            .select("risk_level, risk_probability, recommendations")
+            .eq("matric_no", r.matric_no)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          return { ...r, prediction: preds };
+        })
+      );
+      return enriched;
     },
   });
 
@@ -71,7 +91,7 @@ function CounselorPage() {
         <section className="mt-10">
           <div className="mb-4 flex items-end justify-between">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight">Assigned referrals & AI Diagnostics</h2>
+              <h2 className="text-xl font-semibold tracking-tight">Assigned referrals &amp; AI Diagnostics</h2>
               <p className="text-sm text-muted-foreground">Students flagged by AI Early Warning or faculty for counselor intervention.</p>
             </div>
           </div>
@@ -85,9 +105,8 @@ function CounselorPage() {
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
               {refQ.data!.map((r: any) => {
-                const preds = r.students?.predictions;
-                const predObj = Array.isArray(preds) ? preds[0] : preds;
-                const riskLevel = predObj?.risk_level || (r.cgpa_at_referral < 2.5 ? "High Risk" : "Medium Risk");
+                const pred = r.prediction;
+                const riskLevel = pred?.risk_level ?? (r.cgpa_at_referral < 2.5 ? "High Risk" : "Medium Risk");
 
                 return (
                   <div key={r.id} className="card-elevated rounded-2xl p-5 border border-border/80">
@@ -102,41 +121,42 @@ function CounselorPage() {
                     </div>
                     <div className="mt-3 text-base font-semibold">{r.students?.student_name ?? r.matric_no}</div>
                     <div className="text-[12px] text-muted-foreground">
-                      {r.matric_no} · {r.students?.department} · L{r.students?.level}
+                      {r.matric_no} &middot; {r.students?.department} &middot; L{r.students?.level}
                     </div>
                     <div className="mt-3 text-sm">
                       Reason: <span className="font-medium">{r.referral_reason}</span>
                     </div>
                     <div className="text-[13px] text-muted-foreground">
                       CGPA at referral: {Number(r.cgpa_at_referral).toFixed(2)}
-                      {r.meeting_deadline && ` · meet by ${new Date(r.meeting_deadline).toLocaleDateString()}`}
+                      {r.meeting_deadline && ` - meet by ${new Date(r.meeting_deadline).toLocaleDateString()}`}
                     </div>
 
-                    {predObj?.decision_reason && (
+                    {pred?.risk_probability && (
                       <div className="mt-3 rounded-xl bg-accent/40 p-2.5 text-[11px] text-muted-foreground">
-                        <span className="font-semibold text-foreground">AI Rationale: </span>
-                        {predObj.decision_reason}
+                        <span className="font-semibold text-foreground">AI Risk Probability: </span>
+                        {(Number(pred.risk_probability) * 100).toFixed(1)}%
                       </div>
                     )}
 
-                  {r.status === "PENDING" && (
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        onClick={() => updateStatus.mutate({ id: r.id, status: "COMPLETED" })}
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-success/15 px-3 py-2 text-[13px] font-medium text-success hover:bg-success/25"
-                      >
-                        <CheckCircle2 className="size-4" /> Mark completed
-                      </button>
-                      <button
-                        onClick={() => updateStatus.mutate({ id: r.id, status: "MISSED" })}
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-destructive/15 px-3 py-2 text-[13px] font-medium text-destructive hover:bg-destructive/25"
-                      >
-                        <XCircle className="size-4" /> Missed
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    {r.status === "PENDING" && (
+                      <div className="mt-4 flex gap-2">
+                        <button
+                          onClick={() => updateStatus.mutate({ id: r.id, status: "COMPLETED" })}
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-success/15 px-3 py-2 text-[13px] font-medium text-success hover:bg-success/25"
+                        >
+                          <CheckCircle2 className="size-4" /> Mark completed
+                        </button>
+                        <button
+                          onClick={() => updateStatus.mutate({ id: r.id, status: "MISSED" })}
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-destructive/15 px-3 py-2 text-[13px] font-medium text-destructive hover:bg-destructive/25"
+                        >
+                          <XCircle className="size-4" /> Missed
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
@@ -148,13 +168,15 @@ function CounselorPage() {
 function Loading() {
   return (
     <div className="card-elevated flex items-center gap-2 rounded-2xl p-6 text-sm text-muted-foreground">
-      <Loader2 className="size-4 animate-spin" /> Loading…
+      <Loader2 className="size-4 animate-spin" /> Loading referrals...
     </div>
   );
 }
+
 function Empty({ text }: { text: string }) {
   return <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground">{text}</div>;
 }
+
 function tone(s: string) {
   if (s === "COMPLETED") return "bg-success/15 text-success";
   if (s === "PENDING") return "bg-warning/15 text-warning";

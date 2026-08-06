@@ -20,9 +20,10 @@ function AdminStudentsPage() {
     queryKey: ["admin-students-ai"],
     enabled: !!isAdmin,
     queryFn: async () => {
+      const selectCols = "matric_no, student_name, level, cgpa_summary(cgpa, classification, status), predictions(risk_level, predicted_gpa, trend_direction)";
       const { data, error } = await supabase
         .from("students")
-        .select("matric_no, student_name, level, cgpa_summary(cgpa, classification, status), predictions(risk_level, predicted_gpa, trend_direction)")
+        .select(selectCols)
         .order("student_name", { ascending: true });
       if (error) throw error;
       return data ?? [];
