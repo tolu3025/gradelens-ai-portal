@@ -43,16 +43,15 @@ function AdminStudentsPage() {
           (p.matric_no ? studentMapByMatric.get(p.matric_no) : null) ||
           (p.full_name ? studentMapByName.get(p.full_name.toLowerCase()) : null);
 
-        // Fallback matric generation if not set yet
-        const displayMatric = p.matric_no || studentRow?.matric_no || `2024/${Math.floor(10000 + (p.id ? p.id.charCodeAt(0) * 31 : 58720) % 90000)}`;
-        const displayLevel = studentRow?.level ?? 100;
+        const realMatric = p.matric_no || studentRow?.matric_no || null;
+        const realLevel = studentRow?.level ?? null;
 
         return {
           id: p.id,
-          matric_no: displayMatric,
+          matric_no: realMatric,
           student_name: p.full_name ?? p.email?.split("@")[0] ?? "Student",
           email: p.email,
-          level: displayLevel,
+          level: realLevel,
           department: studentRow?.department ?? "Software Engineering",
         };
       });
@@ -68,8 +67,8 @@ function AdminStudentsPage() {
     return list.filter(
       (x: any) =>
         x.student_name?.toLowerCase().includes(s) ||
-        x.matric_no?.toLowerCase().includes(s) ||
-        x.email?.toLowerCase().includes(s),
+        (x.matric_no && x.matric_no.toLowerCase().includes(s)) ||
+        (x.email && x.email.toLowerCase().includes(s)),
     );
   }, [studentsQ.data, q]);
 
@@ -141,10 +140,10 @@ function AdminStudentsPage() {
                         <td className="px-6 py-3 font-semibold">{s.student_name}</td>
                         <td className="px-3 py-3 text-[12px] text-muted-foreground">{s.email ?? "—"}</td>
                         <td className="px-3 py-3 font-mono font-medium text-foreground">
-                          {s.matric_no}
+                          {s.matric_no ? s.matric_no : <span className="text-warning text-xs font-sans italic">Update required</span>}
                         </td>
                         <td className="px-3 py-3 text-muted-foreground font-medium">
-                          L{s.level}
+                          {s.level ? `L${s.level}` : <span className="text-muted-foreground/50 text-xs italic">—</span>}
                         </td>
                         <td className="px-3 py-3 text-[12px] text-muted-foreground">
                           {s.department}

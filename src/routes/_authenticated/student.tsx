@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { AppNav } from "@/components/AppNav";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, UserCheck, Sparkles } from "lucide-react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 import { AIInsightPanel } from "@/components/ai/AIInsightPanel";
 
@@ -12,17 +14,115 @@ export const Route = createFileRoute("/_authenticated/student")({
 });
 
 function StudentPage() {
+  const qc = useQueryClient();
   const { data: me } = useCurrentUser();
   const matric = me?.matricNo;
 
+  // Profile prompt update state
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [fullNameInput, setFullNameInput] = useState("");
+  const [matricInput, setMatricInput] = useState("");
+  const [levelInput, setLevelInput] = useState("100");
+  const [departmentInput, setDepartmentInput] = useState("Software Engineering");
+  const [programmeInput, setProgrammeInput] = useState("B.Sc. Software Engineering");
+
+  const studentDbQ = useQuery({
+    queryKey: ["student-db-record", me?.userId, matric],
+    queryFn: async () => {
+      if (!me?.userId) return null;
+
+      // 1. Check profiles table
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("full_name, matric_no")
+        .eq("id", me.userId)
+        .maybeSingle();
+
+      const mat = prof?.matric_no || matric;
+
+      // 2. Check students table
+      let student = null;
+      if (mat) {
+        const { data: st } = await supabase
+          .from("students")
+          .select("*")
+          .eq("matric_no", mat)
+          .maybeSingle();
+        student = st;
+      }
+
+      return { prof, student, activeMatric: mat };
+    },
+  });
+
+  useEffect(() => {
+    if (me) {
+      setFullNameInput(me.fullName ?? "");
+      setMatricInput(me.matricNo ?? "");
+    }
+    if (studentDbQ.data?.student) {
+      const s = studentDbQ.data.student;
+      if (s.level) setLevelInput(String(s.level));
+      if (s.department) setDepartmentInput(s.department);
+      if (s.programme) setProgrammeInput(s.programme);
+      if (s.student_name) setFullNameInput(s.student_name);
+    }
+  }, [me, studentDbQ.data]);
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async () => {
+      if (!me?.userId) throw new Error("Not authenticated");
+      const mat = matricInput.trim().toUpperCase();
+      const name = fullNameInput.trim() || me.email?.split("@")[0] || "Student";
+      const lvl = Number(levelInput) || 100;
+      const dept = departmentInput.trim() || "Software Engineering";
+      const prog = programmeInput.trim() || "B.Sc. Software Engineering";
+
+      if (!mat) throw new Error("Please enter your official Matriculation Number");
+
+      // 1. Update profiles table
+      const { error: pErr } = await supabase
+        .from("profiles")
+        .upsert({ id: me.userId, email: me.email, full_name: name, matric_no: mat });
+      if (pErr) throw pErr;
+
+      // 2. Upsert students table
+      const { error: sErr } = await supabase
+        .from("students")
+        .upsert({
+          matric_no: mat,
+          student_name: name,
+          level: lvl,
+          department: dept,
+          programme: prog,
+        });
+      if (sErr) throw sErr;
+
+      // 3. Update auth metadata
+      await supabase.auth.updateUser({
+        data: { full_name: name, matric_no: mat, level: lvl, department: dept, programme: prog },
+      });
+
+      return { mat, name, lvl, dept, prog };
+    },
+    onSuccess: () => {
+      toast.success("Academic details verified & updated successfully!");
+      setShowUpdateModal(false);
+      qc.invalidateQueries();
+    },
+    onError: (e: any) => toast.error(e.message || "Failed to update profile"),
+  });
+
+  const activeMatric = studentDbQ.data?.activeMatric || matric;
+
   const cgpaQ = useQuery({
-    queryKey: ["cgpa", matric],
-    enabled: !!matric,
+    queryKey: ["cgpa", activeMatric],
+    enabled: !!activeMatric,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("cgpa_summary")
         .select("*")
-        .eq("matric_no", matric!)
+        .eq("matric_no", activeMatric!)
         .order("level", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -32,13 +132,13 @@ function StudentPage() {
   });
 
   const gradesQ = useQuery({
-    queryKey: ["grades", matric],
-    enabled: !!matric,
+    queryKey: ["grades", activeMatric],
+    enabled: !!activeMatric,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("grades")
         .select("*")
-        .eq("matric_no", matric!)
+        .eq("matric_no", activeMatric!)
         .order("level", { ascending: true })
         .order("semester", { ascending: true });
       if (error) throw error;
@@ -47,13 +147,13 @@ function StudentPage() {
   });
 
   const referralsQ = useQuery({
-    queryKey: ["my-referrals", matric],
-    enabled: !!matric,
+    queryKey: ["my-referrals", activeMatric],
+    enabled: !!activeMatric,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("counselor_referrals")
         .select("*, counselors(full_name, email)")
-        .eq("matric_no", matric!)
+        .eq("matric_no", activeMatric!)
         .order("referred_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -83,21 +183,120 @@ function StudentPage() {
     <div className="min-h-screen">
       <AppNav role="student" name={me?.fullName ?? undefined} />
       <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 md:pt-12">
-        {!matric ? (
-          <EmptyState title="No student record linked" desc="Your account isn't connected to a matric number yet." />
+
+        {/* PROMPT BANNER FOR ACADEMIC DETAILS VERIFICATION */}
+        <section className="mb-8 card-elevated rounded-3xl p-6 border border-primary/30 bg-primary/5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary/20 text-primary">
+                <UserCheck className="size-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold">Verify &amp; Update Your Academic Profile</h3>
+                <p className="text-xs text-muted-foreground">
+                  Confirm your official Matriculation Number, Academic Level, and Department for AI Warnings &amp; Counseling records.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowUpdateModal((s) => !s)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition shadow-sm"
+            >
+              <Sparkles className="size-3.5" />
+              {showUpdateModal ? "Hide Details Form" : "Enter / Update Correct Details"}
+            </button>
+          </div>
+
+          {/* INLINE EDITABLE DETAILS FORM */}
+          {showUpdateModal && (
+            <div className="mt-6 border-t border-primary/20 pt-6">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Full Name *</label>
+                  <input
+                    value={fullNameInput}
+                    onChange={(e) => setFullNameInput(e.target.value)}
+                    placeholder="e.g. Ayinoluwa Ifeoluwa"
+                    className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Matriculation No. *</label>
+                  <input
+                    value={matricInput}
+                    onChange={(e) => setMatricInput(e.target.value)}
+                    placeholder="e.g. 2024/11705"
+                    className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Academic Level *</label>
+                  <select
+                    value={levelInput}
+                    onChange={(e) => setLevelInput(e.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
+                  >
+                    <option value="100">100 Level</option>
+                    <option value="200">200 Level</option>
+                    <option value="300">300 Level</option>
+                    <option value="400">400 Level</option>
+                    <option value="500">500 Level</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Department</label>
+                  <input
+                    value={departmentInput}
+                    onChange={(e) => setDepartmentInput(e.target.value)}
+                    placeholder="Software Engineering"
+                    className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Programme</label>
+                  <input
+                    value={programmeInput}
+                    onChange={(e) => setProgrammeInput(e.target.value)}
+                    placeholder="B.Sc. Software Engineering"
+                    className="mt-1 w-full rounded-2xl border border-border bg-card px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40 font-medium"
+                  />
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    onClick={() => updateProfileMutation.mutate()}
+                    disabled={updateProfileMutation.isPending}
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition disabled:opacity-60"
+                  >
+                    {updateProfileMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                    Save &amp; Update Record
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {!activeMatric ? (
+          <EmptyState title="Please verify your Matriculation Number above" desc="Enter your official matriculation number in the form above to display your CGPA and grades." />
         ) : (
           <>
             <CgpaCard
               loading={cgpaQ.isLoading}
               data={cgpaQ.data}
-              name={me?.fullName ?? cgpaQ.data?.student_name ?? "Student"}
-              matric={matric}
+              name={me?.fullName ?? studentDbQ.data?.student?.student_name ?? "Student"}
+              matric={activeMatric}
             />
 
             {/* AI Academic Early Warning & Predictive Intelligence Panel */}
             <section className="mt-10">
               <AIInsightPanel
-                matricNo={matric}
+                matricNo={activeMatric}
                 currentCgpa={cgpaQ.data ? Number(cgpaQ.data.cgpa) : 0}
                 pastGpas={semesterStats.list.map((s) => s.gpa)}
                 failedCoursesCount={semesterStats.failedCount}

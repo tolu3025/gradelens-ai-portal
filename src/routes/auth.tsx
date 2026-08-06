@@ -21,9 +21,14 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Student Details State
   const [fullName, setFullName] = useState("");
   const [matric, setMatric] = useState("");
   const [level, setLevel] = useState("100");
+  const [department, setDepartment] = useState("Software Engineering");
+  const [programme, setProgramme] = useState("B.Sc. Software Engineering");
+  
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -37,32 +42,55 @@ function AuthPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        const formattedMatric = matric.trim().toUpperCase() || `2024/${Math.floor(10000 + Math.random() * 90000)}`;
+        const formattedMatric = matric.trim().toUpperCase();
         const selectedLevel = Number(level) || 100;
+        const dept = department.trim() || "Software Engineering";
+        const prog = programme.trim() || "B.Sc. Software Engineering";
 
-        // Step 1: Create account
+        if (!formattedMatric) {
+          throw new Error("Please enter your official Matriculation Number (e.g. 2024/11705)");
+        }
+
+        // Step 1: Create account in Auth with complete metadata
         const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin + "/dashboard",
-            data: { full_name: fullName, matric_no: formattedMatric, level: selectedLevel },
+            data: {
+              full_name: fullName,
+              matric_no: formattedMatric,
+              level: selectedLevel,
+              department: dept,
+              programme: prog
+            },
           },
         });
         if (signUpError) throw signUpError;
 
-        // Step 2: Sign in immediately to get an authenticated session
+        // Step 2: Sign in immediately to establish authenticated session
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
 
-        // Step 3: Now authenticated — write student record (RLS allows authenticated users)
+        // Step 3: Upsert into students table in Supabase
         await supabase.from("students").upsert({
           matric_no: formattedMatric,
           student_name: fullName || email.split("@")[0],
           level: selectedLevel,
-          department: "Software Engineering",
-          programme: "B.Sc. Software Engineering"
+          department: dept,
+          programme: prog
         });
+
+        // Step 4: Update profiles table with matric_no & full_name
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user?.id) {
+          await supabase.from("profiles").upsert({
+            id: userData.user.id,
+            email,
+            full_name: fullName,
+            matric_no: formattedMatric
+          });
+        }
 
         toast.success("Account created successfully!");
       } else {
@@ -78,11 +106,10 @@ function AuthPage() {
     }
   }
 
-
   return (
     <div className="min-h-screen">
       <AppNav />
-      <main className="mx-auto flex max-w-md flex-col px-4 pb-24 pt-16 md:pt-24">
+      <main className="mx-auto flex max-w-md flex-col px-4 pb-24 pt-12 md:pt-16">
         <div className="card-elevated rounded-3xl p-8">
           <div className="mb-6">
             <h1 className="text-2xl font-semibold tracking-tight">
@@ -91,7 +118,7 @@ function AuthPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               {mode === "signin"
                 ? "Sign in to access your Grade Lens portal."
-                : "Students: enter your full name, level, and matric number."}
+                : "Students: enter your full name, matric number, level, and department."}
             </p>
           </div>
 
@@ -99,50 +126,76 @@ function AuthPage() {
             {mode === "signup" && (
               <>
                 <div>
-                  <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Full name *</label>
+                  <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Full Name *</label>
                   <input
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
-                    placeholder="Jane Doe"
-                    className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-transparent focus:ring-focus"
+                    placeholder="e.g. Ayinoluwa Ifeoluwa"
+                    className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none focus:ring-focus font-medium"
                   />
                 </div>
+
                 <div>
-                  <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Academic Level *</label>
-                  <select
-                    value={level}
-                    onChange={(e) => setLevel(e.target.value)}
-                    className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none focus:border-transparent focus:ring-focus"
-                  >
-                    <option value="100">100 Level</option>
-                    <option value="200">200 Level</option>
-                    <option value="300">300 Level</option>
-                    <option value="400">400 Level</option>
-                    <option value="500">500 Level</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Matric No. (Format: e.g. 2024/58720)</label>
+                  <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Matriculation Number *</label>
                   <input
                     value={matric}
                     onChange={(e) => setMatric(e.target.value)}
-                    placeholder="e.g. 2024/58720"
-                    className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-transparent focus:ring-focus"
+                    required
+                    placeholder="e.g. 2024/11705"
+                    className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none focus:ring-focus font-medium"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Academic Level *</label>
+                    <select
+                      value={level}
+                      onChange={(e) => setLevel(e.target.value)}
+                      className="w-full rounded-xl border border-input bg-surface/70 px-3.5 py-2.5 text-sm outline-none focus:ring-focus font-medium"
+                    >
+                      <option value="100">100 Level</option>
+                      <option value="200">200 Level</option>
+                      <option value="300">300 Level</option>
+                      <option value="400">400 Level</option>
+                      <option value="500">500 Level</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Department *</label>
+                    <input
+                      value={department}
+                      onChange={(e) => setDepartment(e.target.value)}
+                      required
+                      placeholder="Software Engineering"
+                      className="w-full rounded-xl border border-input bg-surface/70 px-3.5 py-2.5 text-sm outline-none focus:ring-focus font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Programme</label>
+                  <input
+                    value={programme}
+                    onChange={(e) => setProgramme(e.target.value)}
+                    placeholder="B.Sc. Software Engineering"
+                    className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none focus:ring-focus font-medium"
                   />
                 </div>
               </>
             )}
 
             <div>
-              <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Email address *</label>
+              <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Email Address *</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="you@example.com"
-                className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-transparent focus:ring-focus"
+                className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none focus:ring-focus font-medium"
               />
             </div>
 
@@ -156,7 +209,7 @@ function AuthPage() {
                   required
                   placeholder="••••••••"
                   minLength={6}
-                  className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-transparent focus:ring-focus pr-10"
+                  className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none focus:ring-focus pr-10 font-medium"
                 />
                 <button
                   type="button"
