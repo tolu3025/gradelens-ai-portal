@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppNav } from "@/components/AppNav";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -20,13 +20,14 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [matric, setMatric] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: "/dashboard" });
+      if (data?.user) navigate({ to: "/dashboard" });
     });
   }, [navigate]);
 
@@ -35,16 +36,17 @@ function AuthPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
+        const mat = matric.trim().toUpperCase();
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin + "/dashboard",
-            data: { full_name: fullName, matric_no: matric.trim().toUpperCase() || null },
+            data: { full_name: fullName, matric_no: mat || null },
           },
         });
         if (error) throw error;
-        toast.success("Account created. Signing you in…");
+        toast.success("Account created successfully!");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -60,7 +62,7 @@ function AuthPage() {
 
   return (
     <div className="min-h-screen">
-      <AppNav role={null} />
+      <AppNav />
       <main className="mx-auto flex max-w-md flex-col px-4 pb-24 pt-16 md:pt-24">
         <div className="card-elevated rounded-3xl p-8">
           <div className="mb-6">
@@ -69,46 +71,69 @@ function AuthPage() {
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {mode === "signin"
-                ? "Sign in to view your record."
+                ? "Sign in to access your Grade Lens portal."
                 : "Students: enter your matric number to link your record."}
             </p>
           </div>
 
-          <form onSubmit={submit} className="space-y-3">
+          <form onSubmit={submit} className="space-y-4">
             {mode === "signup" && (
               <>
-                <Field
-                  label="Full name"
-                  value={fullName}
-                  onChange={setFullName}
-                  required
-                  placeholder="Jane Doe"
-                />
-                <Field
-                  label="Matric no. (students only)"
-                  value={matric}
-                  onChange={setMatric}
-                  placeholder="e.g. CSC/2020/001"
-                />
+                <div>
+                  <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Full name *</label>
+                  <input
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    placeholder="Jane Doe"
+                    className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-transparent focus:ring-focus"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Matric No. (Format: e.g. 2024/58720)</label>
+                  <input
+                    value={matric}
+                    onChange={(e) => setMatric(e.target.value)}
+                    placeholder="e.g. 2024/58720"
+                    className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-transparent focus:ring-focus"
+                  />
+                </div>
               </>
             )}
-            <Field
-              label="Email"
-              type="email"
-              value={email}
-              onChange={setEmail}
-              required
-              placeholder="you@example.com"
-            />
-            <Field
-              label="Password"
-              type="password"
-              value={password}
-              onChange={setPassword}
-              required
-              placeholder="••••••••"
-              minLength={6}
-            />
+
+            <div>
+              <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Email address *</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="you@example.com"
+                className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-transparent focus:ring-focus"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">Password *</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                  minLength={6}
+                  className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-transparent focus:ring-focus pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+            </div>
 
             <button
               type="submit"
@@ -132,32 +157,5 @@ function AuthPage() {
         </div>
       </main>
     </div>
-  );
-}
-
-function Field({
-  label, value, onChange, type = "text", required, placeholder, minLength,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  required?: boolean;
-  placeholder?: string;
-  minLength?: number;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-[12px] font-medium text-muted-foreground">{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        type={type}
-        required={required}
-        placeholder={placeholder}
-        minLength={minLength}
-        className="w-full rounded-xl border border-input bg-surface/70 px-4 py-2.5 text-sm outline-none placeholder:text-muted-foreground/60 focus:border-transparent focus:ring-focus"
-      />
-    </label>
   );
 }

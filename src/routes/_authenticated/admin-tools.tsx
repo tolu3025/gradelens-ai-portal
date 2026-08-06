@@ -230,7 +230,7 @@ function AdminToolsPage() {
                   <input
                     value={matricNo}
                     onChange={(e) => setMatricNo(e.target.value)}
-                    placeholder="e.g. UNIOSUN/SWE/2026/001"
+                    placeholder="e.g. 2024/58720"
                     className="mt-1 w-full rounded-2xl border border-border bg-surface/90 px-3.5 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/40"
                   />
                 </div>

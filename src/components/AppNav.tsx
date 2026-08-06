@@ -4,6 +4,7 @@ import { LogOut, Menu, X } from "lucide-react";
 import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
 import { Icon3d, type Icon3dName } from "./Icon3d";
+import { useCurrentUser } from "@/lib/use-current-user";
 
 interface NavItem {
   to: string;
@@ -11,24 +12,27 @@ interface NavItem {
   icon: Icon3dName;
 }
 
-export function AppNav({ role, name }: { role: "student" | "counselor" | "admin" | null; name?: string }) {
+export function AppNav({ role: propRole, name: propName }: { role?: "student" | "counselor" | "admin" | null; name?: string }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
+  const { data: me } = useCurrentUser();
+
+  const activeRole = propRole ?? me?.primaryRole ?? null;
+  const activeName = propName ?? me?.fullName ?? me?.email ?? undefined;
+  const isSignedIn = !!me?.userId;
 
   const items: NavItem[] = [];
-  if (role === "student") {
+  if (activeRole === "student") {
     items.push({ to: "/student", label: "Overview", icon: "cap" });
     items.push({ to: "/my-grades", label: "Grades", icon: "book" });
     items.push({ to: "/my-referrals", label: "Referrals", icon: "inbox" });
     items.push({ to: "/trends", label: "Trends", icon: "chart" });
     items.push({ to: "/counselors", label: "Counselors", icon: "people" });
-  }
-  if (role === "counselor") {
+  } else if (activeRole === "counselor") {
     items.push({ to: "/counselor", label: "Referrals", icon: "people" });
     items.push({ to: "/leaderboard", label: "Leaderboard", icon: "trophy" });
-  }
-  if (role === "admin") {
+  } else if (activeRole === "admin") {
     items.push({ to: "/admin", label: "Overview", icon: "shield" });
     items.push({ to: "/admin-students", label: "Students", icon: "users" });
     items.push({ to: "/admin-referrals", label: "Referrals", icon: "inbox" });
@@ -36,7 +40,10 @@ export function AppNav({ role, name }: { role: "student" | "counselor" | "admin"
     items.push({ to: "/leaderboard", label: "Leaderboard", icon: "trophy" });
     items.push({ to: "/admin-tools", label: "Tools", icon: "gear" });
   }
-  if (role) items.push({ to: "/profile", label: "Profile", icon: "sparkle" });
+
+  if (isSignedIn) {
+    items.push({ to: "/profile", label: "Profile", icon: "sparkle" });
+  }
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -73,15 +80,15 @@ export function AppNav({ role, name }: { role: "student" | "counselor" | "admin"
         </nav>
 
         <div className="flex items-center gap-2">
-          {name && (
-            <span className="hidden max-w-[12ch] truncate text-[13px] text-muted-foreground sm:inline">
-              {name}
+          {activeName && (
+            <span className="hidden max-w-[14ch] truncate text-[13px] text-muted-foreground sm:inline">
+              {activeName}
             </span>
           )}
-          {role ? (
+          {isSignedIn ? (
             <button
               onClick={signOut}
-              className="hidden items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[13px] font-medium hover:bg-accent md:flex"
+              className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[13px] font-medium hover:bg-accent"
             >
               <LogOut className="size-3.5" /> Sign out
             </button>
@@ -93,7 +100,7 @@ export function AppNav({ role, name }: { role: "student" | "counselor" | "admin"
               Sign in
             </Link>
           )}
-          {role && (
+          {isSignedIn && (
             <button
               onClick={() => setOpen((o) => !o)}
               className="rounded-full bg-secondary p-2 md:hidden"
@@ -105,7 +112,7 @@ export function AppNav({ role, name }: { role: "student" | "counselor" | "admin"
         </div>
       </div>
 
-      {role && open && (
+      {isSignedIn && open && (
         <div className="glass mx-auto mt-2 grid max-w-6xl gap-1 rounded-2xl p-2 md:hidden">
           {items.map((it) => (
             <Link
