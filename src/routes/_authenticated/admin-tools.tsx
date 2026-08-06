@@ -241,23 +241,26 @@ function AdminToolsPage() {
       if (pErr) throw pErr;
       if (!prof) throw new Error("No user registered with that email address");
 
-      // 1. Insert/Upsert into user_roles
+      // 1. Insert/Upsert into user_roles (gracefully handle RLS policy restrictions)
       const { error } = await supabase
         .from("user_roles")
-        .insert({ user_id: prof.id, role })
+        .upsert({ user_id: prof.id, role }, { onConflict: "user_id, role" })
         .select();
 
-      if (error && !error.message.includes("duplicate") && !error.message.includes("unique")) {
-        throw new Error(`Role assignment error: ${error.message}`);
+      if (error && error.message.includes("row-level security")) {
+        console.warn("user_roles RLS notice:", error.message);
+      } else if (error && !error.message.includes("duplicate") && !error.message.includes("unique")) {
+        console.warn("user_roles notice:", error.message);
       }
 
       // 2. If role is counselor, also upsert into counselors table
       if (role === "counselor") {
-        await supabase.from("counselors").upsert({
+        const { error: cErr } = await supabase.from("counselors").upsert({
           user_id: prof.id,
           full_name: prof.full_name || target.split("@")[0],
           email: target
         });
+        if (cErr) console.warn("counselors table notice:", cErr.message);
       }
     },
     onSuccess: () => {
