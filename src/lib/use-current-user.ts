@@ -27,6 +27,12 @@ export function useCurrentUser() {
 
       const roleList = (roles ?? []).map((r) => r.role as Role);
 
+      // Check metadata or default admin fallback
+      const metaRole = user.user_metadata?.role as Role | undefined;
+      if (metaRole && !roleList.includes(metaRole)) {
+        roleList.push(metaRole);
+      }
+
       // Auto-assign student role if matric_no exists or user signed up
       const matric = profile?.matric_no ?? (user.user_metadata?.matric_no as string) ?? null;
       if (roleList.length === 0) {
@@ -45,6 +51,6 @@ export function useCurrentUser() {
         primaryRole: primaryRole,
       };
     },
-    staleTime: 60_000,
+    staleTime: 5_000,
   });
 }

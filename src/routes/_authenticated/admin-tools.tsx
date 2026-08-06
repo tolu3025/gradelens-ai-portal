@@ -175,30 +175,31 @@ function AdminToolsPage() {
       if (pErr) throw pErr;
       if (!prof) throw new Error("No user registered with that email address");
 
-      // Upsert into user_roles
+      // 1. Insert/Upsert into user_roles
       const { error } = await supabase
         .from("user_roles")
-        .upsert({ user_id: prof.id, role })
+        .insert({ user_id: prof.id, role })
         .select();
 
-      if (error) {
-        console.warn("user_roles notice:", error.message);
+      if (error && !error.message.includes("duplicate") && !error.message.includes("unique")) {
+        throw new Error(`Role assignment error: ${error.message}`);
       }
 
-      // If role is counselor, also upsert into counselors table
+      // 2. If role is counselor, also upsert into counselors table
       if (role === "counselor") {
-        const { error: cErr } = await supabase.from("counselors").upsert({
+        await supabase.from("counselors").upsert({
           user_id: prof.id,
           full_name: prof.full_name || target.split("@")[0],
           email: target
         });
-        if (cErr) console.warn("counselors table notice:", cErr.message);
       }
     },
     onSuccess: () => {
       toast.success(`Granted ${role} role successfully!`);
       setEmail("");
       qc.invalidateQueries({ queryKey: ["admin-roles"] });
+      qc.invalidateQueries({ queryKey: ["current-user"] });
+      qc.invalidateQueries();
     },
     onError: (e: any) => toast.error(e.message ?? "Could not grant role"),
   });
