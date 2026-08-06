@@ -68,8 +68,8 @@ export function AppNav({ role: propRole, name: propName }: { role?: "student" | 
   return (
     <header className="sticky top-0 z-40 px-3 pt-3 bg-background">
       <div className="bg-card border border-border/80 shadow-sm mx-auto flex max-w-6xl items-center justify-between rounded-2xl px-3 py-2">
-        <Link to="/" className="flex items-center gap-2 px-1">
-          <Icon3d name="app" size={32} priority />
+        <Link to="/" className="flex items-center gap-2.5 px-1">
+          <img src="/logo.png" alt="Grade Lens Logo" className="size-8 object-contain rounded-lg" />
           <span className="font-display text-[15px] font-semibold tracking-tight">Grade Lens</span>
         </Link>
 

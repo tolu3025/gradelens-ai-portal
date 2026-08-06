@@ -26,14 +26,8 @@ function Landing() {
       <main className="mx-auto max-w-6xl px-4 pb-28 pt-12 md:pt-20">
         {/* HERO SECTION */}
         <section className="text-center animate-[fade-in_0.6s_ease-out]">
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1.5 text-[12px] font-semibold text-primary backdrop-blur">
-            <Sparkles className="size-3.5 animate-pulse text-primary" />
-            AI-Powered Academic Early Warning System · 99.58% Accuracy
-          </div>
-
-          <div className="mt-6 flex items-center justify-center gap-3">
-            <Icon3d name="cap" size={72} priority />
-            <Icon3d name="sparkle" size={40} className="-mt-8" />
+          <div className="mt-4 flex items-center justify-center">
+            <img src="/logo.png" alt="GradeLens Logo" className="size-24 object-contain rounded-2xl shadow-xl border border-primary/20" />
           </div>
 
           <h1 className="mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight md:text-6xl text-gradient">
@@ -199,7 +193,7 @@ function Landing() {
       <footer className="border-t border-border/60 py-10 text-center text-xs text-muted-foreground bg-card">
         <div className="mx-auto max-w-6xl px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Icon3d name="app" size={24} />
+            <img src="/logo.png" alt="GradeLens Logo" className="size-6 object-contain rounded-md" />
             <span className="font-semibold text-foreground">GradeLens AI Academic Warning System</span>
           </div>
           <div>© {new Date().getFullYear()} GradeLens. All rights reserved.</div>
