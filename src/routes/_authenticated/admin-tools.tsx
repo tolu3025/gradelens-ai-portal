@@ -166,21 +166,39 @@ function AdminToolsPage() {
   const grant = useMutation({
     mutationFn: async () => {
       const target = email.trim().toLowerCase();
-      if (!target) throw new Error("Enter an email");
+      if (!target) throw new Error("Enter an email address");
       const { data: prof, error: pErr } = await supabase
         .from("profiles")
-        .select("id")
+        .select("id, full_name, email")
         .eq("email", target)
         .maybeSingle();
       if (pErr) throw pErr;
-      if (!prof) throw new Error("No user with that email");
+      if (!prof) throw new Error("No user registered with that email address");
+
+      // Upsert into user_roles
       const { error } = await supabase
         .from("user_roles")
-        .insert({ user_id: prof.id, role });
-      if (error) throw error;
+        .upsert({ user_id: prof.id, role })
+        .select();
+
+      if (error) {
+        if (error.message.includes("row-level security")) {
+          throw new Error(`RLS Policy blocked role grant. Please tell the counselor to register directly via the Counselor Portal on /auth.`);
+        }
+        throw error;
+      }
+
+      // If role is counselor, also upsert into counselors table
+      if (role === "counselor") {
+        await supabase.from("counselors").upsert({
+          user_id: prof.id,
+          full_name: prof.full_name || target.split("@")[0],
+          email: target
+        });
+      }
     },
     onSuccess: () => {
-      toast.success(`Granted ${role}`);
+      toast.success(`Granted ${role} role successfully!`);
       setEmail("");
       qc.invalidateQueries({ queryKey: ["admin-roles"] });
     },
