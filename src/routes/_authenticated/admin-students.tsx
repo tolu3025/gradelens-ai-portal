@@ -5,84 +5,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/lib/use-current-user";
 import { AppNav, PageHeader } from "@/components/AppNav";
 import { Icon3d } from "@/components/Icon3d";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, UserX } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin-students")({
   component: AdminStudentsPage,
 });
-
-const DEMO_STUDENTS = [
-  {
-    matric_no: "2024/60112",
-    student_name: "Eniola Gbenga",
-    level: 300,
-    cgpa_summary: { cgpa: 2.34, classification: "Third Class", status: "BELOW AVERAGE" },
-    predictions: { risk_level: "High Risk", predicted_gpa: 2.40, trend_direction: "Declining" }
-  },
-  {
-    matric_no: "2024/58720",
-    student_name: "Chidimma Adeleke",
-    level: 300,
-    cgpa_summary: { cgpa: 2.15, classification: "Third Class", status: "BELOW AVERAGE" },
-    predictions: { risk_level: "High Risk", predicted_gpa: 2.20, trend_direction: "Declining" }
-  },
-  {
-    matric_no: "2023/41920",
-    student_name: "Babajide Okafor",
-    level: 200,
-    cgpa_summary: { cgpa: 2.68, classification: "Second Class Lower", status: "AVERAGE" },
-    predictions: { risk_level: "Medium Risk", predicted_gpa: 2.75, trend_direction: "Stable" }
-  },
-  {
-    matric_no: "2022/31094",
-    student_name: "Fatima Ibrahim",
-    level: 400,
-    cgpa_summary: { cgpa: 1.94, classification: "Fail", status: "BELOW AVERAGE" },
-    predictions: { risk_level: "High Risk", predicted_gpa: 2.05, trend_direction: "Declining" }
-  },
-  {
-    matric_no: "2024/10492",
-    student_name: "Emmanuel Danjuma",
-    level: 100,
-    cgpa_summary: { cgpa: 4.62, classification: "First Class", status: "ABOVE AVERAGE" },
-    predictions: { risk_level: "Low Risk", predicted_gpa: 4.70, trend_direction: "Improving" }
-  },
-  {
-    matric_no: "2023/88123",
-    student_name: "Zainab Bello",
-    level: 200,
-    cgpa_summary: { cgpa: 3.82, classification: "Second Class Upper", status: "ABOVE AVERAGE" },
-    predictions: { risk_level: "Low Risk", predicted_gpa: 3.90, trend_direction: "Improving" }
-  },
-  {
-    matric_no: "2022/94012",
-    student_name: "Oluwaseun Alabi",
-    level: 400,
-    cgpa_summary: { cgpa: 3.41, classification: "Second Class Lower", status: "AVERAGE" },
-    predictions: { risk_level: "Medium Risk", predicted_gpa: 3.35, trend_direction: "Declining" }
-  },
-  {
-    matric_no: "2024/77182",
-    student_name: "Adeola Ogunleye",
-    level: 100,
-    cgpa_summary: { cgpa: 4.10, classification: "Second Class Upper", status: "ABOVE AVERAGE" },
-    predictions: { risk_level: "Low Risk", predicted_gpa: 4.15, trend_direction: "Stable" }
-  },
-  {
-    matric_no: "2023/12093",
-    student_name: "Kayode Adeleke",
-    level: 200,
-    cgpa_summary: { cgpa: 2.85, classification: "Second Class Lower", status: "AVERAGE" },
-    predictions: { risk_level: "Medium Risk", predicted_gpa: 2.90, trend_direction: "Improving" }
-  },
-  {
-    matric_no: "2021/67891",
-    student_name: "Folake Adebayo",
-    level: 400,
-    cgpa_summary: { cgpa: 4.55, classification: "First Class", status: "ABOVE AVERAGE" },
-    predictions: { risk_level: "Low Risk", predicted_gpa: 4.60, trend_direction: "Improving" }
-  }
-];
 
 function AdminStudentsPage() {
   const { data: me } = useCurrentUser();
@@ -98,49 +25,21 @@ function AdminStudentsPage() {
         .from("students")
         .select(selectCols)
         .order("student_name", { ascending: true });
-      
-      if (error || !data || data.length === 0) return DEMO_STUDENTS;
-
-      // Merge database records with demo list to ensure full student dataset
-      const existingMatrics = new Set(data.map((d: any) => d.matric_no));
-      const merged = [...data];
-      for (const d of DEMO_STUDENTS) {
-        if (!existingMatrics.has(d.matric_no)) {
-          merged.push(d);
-        }
-      }
-      return merged;
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
-  const studentList = (studentsQ.data && studentsQ.data.length > 0) ? studentsQ.data : DEMO_STUDENTS;
-
   const filtered = useMemo(() => {
+    const list = studentsQ.data ?? [];
     const s = q.trim().toLowerCase();
-    if (!s) return studentList;
-
-    const matches = studentList.filter(
+    if (!s) return list;
+    return list.filter(
       (x: any) =>
         x.student_name?.toLowerCase().includes(s) ||
         x.matric_no?.toLowerCase().includes(s),
     );
-
-    // Dynamic search fallback for searched student names
-    if (matches.length === 0 && s.length > 2) {
-      const formattedName = q.trim().split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-      return [
-        {
-          matric_no: `2024/${Math.floor(10000 + Math.random() * 90000)}`,
-          student_name: formattedName,
-          level: 200,
-          cgpa_summary: { cgpa: 2.78, classification: "Second Class Lower", status: "AVERAGE" },
-          predictions: { risk_level: "Medium Risk", predicted_gpa: 2.85, trend_direction: "Stable" }
-        }
-      ];
-    }
-
-    return matches;
-  }, [studentList, q]);
+  }, [studentsQ.data, q]);
 
   return (
     <div className="min-h-screen">
@@ -149,7 +48,7 @@ function AdminStudentsPage() {
         <PageHeader
           eyebrow="Admin"
           title="Students & AI Diagnostics"
-          subtitle="Every student in the system with CGPA standings and AI Academic Warning predictions."
+          subtitle="Every registered student with CGPA standings and AI Academic Warning predictions."
           icon={<Icon3d name="users" size={64} />}
         />
 
@@ -162,27 +61,45 @@ function AdminStudentsPage() {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search by name (e.g. Eniola Gbenga) or matric number (e.g. 2024/58720)"
+                placeholder="Search by student name or matric number…"
                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
               />
-              <span className="text-[12px] text-muted-foreground">{filtered.length} students</span>
+              <span className="text-[12px] text-muted-foreground">
+                {studentsQ.isLoading ? "Loading…" : `${filtered.length} student${filtered.length !== 1 ? "s" : ""}`}
+              </span>
             </div>
 
             <div className="mt-6 card-elevated overflow-hidden rounded-3xl">
               {studentsQ.isLoading ? (
-                <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-                  <Loader2 className="size-4 animate-spin" /> Loading students &amp; AI risk models...
+                <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" /> Loading students from database…
+                </div>
+              ) : studentsQ.error ? (
+                <div className="p-8 text-sm text-destructive">
+                  Failed to load students. Please refresh and try again.
+                </div>
+              ) : (studentsQ.data ?? []).length === 0 ? (
+                <div className="flex flex-col items-center gap-3 p-12 text-center">
+                  <UserX className="size-10 text-muted-foreground/40" />
+                  <p className="text-sm font-medium text-muted-foreground">No students registered yet.</p>
+                  <p className="text-xs text-muted-foreground/70">
+                    Students will appear here once they sign up at the portal and provide their matric number.
+                  </p>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  No students match &ldquo;{q}&rdquo;.
                 </div>
               ) : (
                 <table className="w-full text-sm">
-                  <thead className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <thead className="text-left text-[11px] uppercase tracking-wider text-muted-foreground bg-accent/30">
                     <tr>
-                      <th className="px-6 py-3 font-medium">Student</th>
-                      <th className="px-3 py-3 font-medium">Matric</th>
+                      <th className="px-6 py-3 font-medium">Student Name</th>
+                      <th className="px-3 py-3 font-medium">Matric No.</th>
                       <th className="px-3 py-3 font-medium">Level</th>
                       <th className="px-3 py-3 text-right font-medium">CGPA</th>
                       <th className="px-3 py-3 font-medium">Classification</th>
-                      <th className="px-3 py-3 font-medium">AI Risk Level</th>
+                      <th className="px-3 py-3 font-medium">AI Risk</th>
                       <th className="px-6 py-3 text-right font-medium">Pred. GPA</th>
                     </tr>
                   </thead>
@@ -193,16 +110,22 @@ function AdminStudentsPage() {
                       const riskLevel = p?.risk_level || (c?.cgpa < 2.5 ? "High Risk" : c?.cgpa < 3.5 ? "Medium Risk" : "Low Risk");
 
                       return (
-                        <tr key={s.matric_no} className="border-t border-border/60">
-                          <td className="px-6 py-3 font-medium">{s.student_name ?? "—"}</td>
-                          <td className="px-3 py-3 text-muted-foreground font-mono">{s.matric_no}</td>
-                          <td className="px-3 py-3 text-muted-foreground">{s.level ?? "—"}</td>
-                          <td className="px-3 py-3 text-right tabular-nums font-semibold">{c?.cgpa ? Number(c.cgpa).toFixed(2) : "—"}</td>
-                          <td className="px-3 py-3 text-muted-foreground">{c?.classification ?? "—"}</td>
+                        <tr key={s.matric_no} className="border-t border-border/60 hover:bg-accent/20 transition-colors">
+                          <td className="px-6 py-3 font-semibold">{s.student_name ?? "—"}</td>
+                          <td className="px-3 py-3 font-mono text-muted-foreground">{s.matric_no}</td>
+                          <td className="px-3 py-3 text-muted-foreground">L{s.level ?? "—"}</td>
+                          <td className="px-3 py-3 text-right tabular-nums font-bold">
+                            {c?.cgpa ? Number(c.cgpa).toFixed(2) : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-muted-foreground text-[12px]">{c?.classification ?? "—"}</td>
                           <td className="px-3 py-3">
-                            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${riskTone(riskLevel)}`}>
-                              {riskLevel}
-                            </span>
+                            {p?.risk_level ? (
+                              <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${riskTone(riskLevel)}`}>
+                                {riskLevel}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground/50">No prediction</span>
+                            )}
                           </td>
                           <td className="px-6 py-3 text-right tabular-nums font-bold text-primary">
                             {p?.predicted_gpa ? Number(p.predicted_gpa).toFixed(2) : "—"}
@@ -210,9 +133,6 @@ function AdminStudentsPage() {
                         </tr>
                       );
                     })}
-                    {filtered.length === 0 && (
-                      <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">No students match.</td></tr>
-                    )}
                   </tbody>
                 </table>
               )}
