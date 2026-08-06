@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Menu, X } from "lucide-react";
+import { LogOut, Menu, X, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect, type ReactNode } from "react";
 import { Icon3d, type Icon3dName } from "./Icon3d";
@@ -19,6 +19,28 @@ export function AppNav({ role: propRole, name: propName }: { role?: "student" | 
   const [open, setOpen] = useState(false);
   const { data: me } = useCurrentUser();
   const queryClient = useQueryClient();
+
+  // Theme Management (Light vs Dark Mode)
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("theme") as "dark" | "light") || "dark";
+    }
+    return "dark";
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "light") {
+      root.classList.add("light");
+      root.classList.remove("dark");
+    } else {
+      root.classList.remove("light");
+      root.classList.add("dark");
+    }
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
@@ -96,6 +118,20 @@ export function AppNav({ role: propRole, name: propName }: { role?: "student" | 
         )}
 
         <div className="flex items-center gap-2">
+          {/* Light / Dark Mode Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            className="flex items-center justify-center rounded-full bg-secondary p-2 text-foreground hover:bg-accent transition"
+            aria-label="Toggle Light/Dark Theme"
+          >
+            {theme === "dark" ? (
+              <Sun className="size-4 text-warning" />
+            ) : (
+              <Moon className="size-4 text-primary" />
+            )}
+          </button>
+
           {isSignedIn && activeName && (
             <span className="hidden max-w-[14ch] truncate text-[13px] text-muted-foreground sm:inline">
               {activeName}
