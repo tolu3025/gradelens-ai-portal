@@ -26,9 +26,7 @@ function Landing() {
       <main className="mx-auto max-w-6xl px-4 pb-28 pt-12 md:pt-20">
         {/* HERO SECTION */}
         <section className="text-center animate-[fade-in_0.6s_ease-out]">
-          <div className="mt-4 flex items-center justify-center">
-            <img src="/logo.png" alt="GradeLens Logo" className="h-28 w-auto object-contain" />
-          </div>
+
 
           <h1 className="mt-5 text-4xl font-extrabold leading-[1.08] tracking-tight md:text-6xl text-gradient">
             Predict Academic Risk.
