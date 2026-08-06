@@ -1,0 +1,156 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: "Geist Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-brand: var(--brand);
+  --color-brand-2: var(--brand-2);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* Apple-inspired: deep near-black canvas, frosted surfaces, vivid accent.
+   No purple/indigo. Single saturated brand: iOS blue. */
+:root {
+  --radius: 1rem;
+
+  --background: oklch(0.14 0.012 250);
+  --foreground: oklch(0.97 0.005 250);
+
+  --surface: oklch(0.18 0.012 250);
+  --surface-elevated: oklch(0.22 0.013 250);
+
+  --card: oklch(0.19 0.012 250);
+  --card-foreground: oklch(0.97 0.005 250);
+
+  --popover: oklch(0.2 0.012 250);
+  --popover-foreground: oklch(0.97 0.005 250);
+
+  --primary: oklch(0.7 0.18 250);
+  --primary-foreground: oklch(0.99 0 0);
+
+  --brand: oklch(0.7 0.18 250);
+  --brand-2: oklch(0.78 0.16 210);
+
+  --secondary: oklch(0.24 0.012 250);
+  --secondary-foreground: oklch(0.97 0.005 250);
+
+  --muted: oklch(0.22 0.011 250);
+  --muted-foreground: oklch(0.7 0.02 250);
+
+  --accent: oklch(0.27 0.02 250);
+  --accent-foreground: oklch(0.97 0.005 250);
+
+  --destructive: oklch(0.65 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.72 0.16 155);
+  --warning: oklch(0.8 0.15 80);
+
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.7 0.18 250);
+
+  --sidebar: oklch(0.16 0.012 250);
+  --sidebar-foreground: oklch(0.97 0.005 250);
+  --sidebar-primary: oklch(0.7 0.18 250);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.24 0.012 250);
+  --sidebar-accent-foreground: oklch(0.97 0.005 250);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.7 0.18 250);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html, body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "ss01", "cv11";
+  }
+  body {
+    background-image:
+      radial-gradient(1200px 600px at 10% -10%, oklch(0.7 0.18 250 / 0.18), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, oklch(0.78 0.16 210 / 0.12), transparent 60%);
+    background-attachment: fixed;
+  }
+  h1, h2, h3, h4 { letter-spacing: -0.02em; font-weight: 600; }
+  h1 { letter-spacing: -0.035em; font-weight: 700; }
+}
+
+@utility glass {
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+  backdrop-filter: saturate(160%) blur(20px);
+  -webkit-backdrop-filter: saturate(160%) blur(20px);
+  border: 1px solid color-mix(in oklab, white 8%, transparent);
+}
+
+@utility card-elevated {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--surface-elevated) 90%, transparent),
+    color-mix(in oklab, var(--surface) 90%, transparent));
+  border: 1px solid color-mix(in oklab, white 7%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 6%, transparent) inset,
+    0 30px 60px -30px oklch(0 0 0 / 0.6),
+    0 8px 24px -12px oklch(0 0 0 / 0.5);
+}
+
+@utility text-gradient {
+  background: linear-gradient(180deg, oklch(0.99 0 0), oklch(0.78 0.02 250));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility ring-focus {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand) 40%, transparent);
+}
