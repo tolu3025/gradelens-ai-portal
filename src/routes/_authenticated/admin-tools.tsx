@@ -86,20 +86,21 @@ function AdminToolsPage() {
       const wp = gradeInfo.point * numCu;
 
       // 1. Insert grade into grades table
-      const { error: gErr } = await supabase.from("grades").upsert({
+      const { error: gErr } = await supabase.from("grades").insert({
         matric_no: mat,
         course_code: code,
         course_title: title,
         score: numScore,
         grade: gradeInfo.grade,
+        grade_point: gradeInfo.point,
         credit_units: numCu,
         weighted_point: wp,
         level: numLvl,
         semester: numSem,
         status: "APPROVED"
-      }, { onConflict: "matric_no, course_code" });
+      });
       
-      if (gErr && !gErr.message.includes("unique")) throw new Error(`Grade insert error: ${gErr.message}`);
+      if (gErr) throw new Error(`Grade insert error: ${gErr.message}`);
 
       // 2. Fetch all grades for this student and compute CGPA
       const { data: allGrades, error: fetchErr } = await supabase
@@ -132,7 +133,7 @@ function AdminToolsPage() {
         last_updated: new Date().toISOString()
       }, { onConflict: "matric_no" });
 
-      if (cgpaErr && !cgpaErr.message.includes("unique")) {
+      if (cgpaErr) {
         throw new Error(`CGPA summary insert error: ${cgpaErr.message}`);
       }
 
@@ -163,20 +164,21 @@ function AdminToolsPage() {
         const gInfo = computeGrade(scoreVal);
         const wp = gInfo.point * cuVal;
 
-        const { error: gErr } = await supabase.from("grades").upsert({
+        const { error: gErr } = await supabase.from("grades").insert({
           matric_no: sub.matric_no,
           course_code: c.code.trim().toUpperCase(),
           course_title: c.title.trim() || c.code,
           score: scoreVal,
           grade: gInfo.grade,
+          grade_point: gInfo.point,
           credit_units: cuVal,
           weighted_point: wp,
           level: Number(sub.level),
           semester: Number(sub.semester),
           status: "APPROVED"
-        }, { onConflict: "matric_no, course_code" });
+        });
 
-        if (gErr && !gErr.message.includes("unique")) {
+        if (gErr) {
           throw new Error(`Grade insert error for ${c.code}: ${gErr.message}`);
         }
       }
@@ -204,7 +206,7 @@ function AdminToolsPage() {
         last_updated: new Date().toISOString()
       }, { onConflict: "matric_no" });
 
-      if (cgpaErr && !cgpaErr.message.includes("unique")) {
+      if (cgpaErr) {
         throw new Error(`CGPA summary insert error: ${cgpaErr.message}`);
       }
 
