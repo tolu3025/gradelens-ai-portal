@@ -15,6 +15,8 @@ import {
   Clock,
   FileSpreadsheet,
   XCircle,
+  ImagePlus,
+  Camera,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -41,8 +43,10 @@ function StudentPage() {
 
   // Result Upload Modal state
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [subLevel, setSubLevel] = useState("100");
+  const [subLevel, setSubLevel] = useState("200");
   const [subSemester, setSubSemester] = useState("1");
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [uploadTab, setUploadTab] = useState<"paste" | "screenshot">("paste");
   const [coursesList, setCoursesList] = useState<Array<{ code: string; title: string; cu: number; score: number }>>([
     { code: "CSC 101", title: "Introduction to Computer Science", cu: 3, score: 75 },
     { code: "MTH 101", title: "General Mathematics I", cu: 3, score: 68 },
@@ -552,57 +556,95 @@ function StudentPage() {
               <div className="mt-6 space-y-4">
                 {/* AUTOMATED RESULT DOCUMENT SCRAPER BOX */}
                 <div className="rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 p-5 text-center">
-                  <div className="flex flex-col items-center gap-2">
-                    <FileSpreadsheet className="size-8 text-primary" />
-                    <span className="text-sm font-bold text-foreground">Auto-Scrape Printed Result Document</span>
-                    <span className="text-xs text-muted-foreground max-w-md">
-                      Paste the text from your PDF result below, or upload a .TXT/.CSV file to automatically extract your courses, credit units, and scores.
-                    </span>
+                {/* TABS: PASTE TEXT | SCREENSHOT */}
+                <div className="flex rounded-2xl bg-secondary/60 p-1 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setUploadTab("paste")}
+                    className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
+                      uploadTab === "paste" ? "bg-card shadow text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    📋 Paste Result Text
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUploadTab("screenshot")}
+                    className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${
+                      uploadTab === "screenshot" ? "bg-card shadow text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    📸 Upload Screenshot
+                  </button>
+                </div>
 
-                    <textarea 
-                      placeholder="Paste your PDF result text here to auto-extract courses..."
-                      className="mt-3 w-full rounded-xl border border-border bg-card px-4 py-3 text-xs font-mono outline-none focus:ring-2 focus:ring-primary/40 min-h-[100px]"
+                {/* PASTE TAB */}
+                {uploadTab === "paste" && (
+                  <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <FileSpreadsheet className="size-5 text-primary" />
+                      <span className="text-sm font-bold">Paste Your Result Text</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Open your PDF result, select all text (Ctrl+A), copy (Ctrl+C), and paste it below.
+                    </p>
+                    <textarea
+                      placeholder="Paste your school portal result text here…"
+                      className="w-full rounded-xl border border-border bg-card px-4 py-3 text-xs font-mono outline-none focus:ring-2 focus:ring-primary/40 min-h-[120px]"
                       onChange={(e) => {
                         const rawText = e.target.value;
                         if (rawText.length > 30) {
                           const parsed = scrapeResultDocumentText(rawText);
                           if (parsed.courses.length > 0) {
                             setCoursesList(parsed.courses);
-                            toast.success(`Scraped ${parsed.courses.length} courses & GPA from pasted text!`);
+                            toast.success(`✅ Extracted ${parsed.courses.length} courses! Review below.`);
                           }
                         }
                       }}
                     />
-                    
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 my-2">OR</span>
+                  </div>
+                )}
 
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-md">
-                      <Upload className="size-4" /> Upload .TXT or .CSV File
+                {/* SCREENSHOT TAB */}
+                {uploadTab === "screenshot" && (
+                  <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Camera className="size-5 text-primary" />
+                      <span className="text-sm font-bold">Upload Screenshot or Photo</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Take a clear screenshot of your school portal result and upload it. The admin will see it alongside your submission for verification.
+                    </p>
+                    <label className="flex flex-col items-center gap-3 cursor-pointer rounded-xl border-2 border-dashed border-primary/30 bg-card p-6 hover:border-primary/60 transition">
+                      {screenshotPreview ? (
+                        <>
+                          <img src={screenshotPreview} alt="Result Screenshot" className="max-h-48 rounded-lg object-contain shadow" />
+                          <span className="text-[11px] text-primary font-semibold">Screenshot uploaded ✓ — click to replace</span>
+                        </>
+                      ) : (
+                        <>
+                          <ImagePlus className="size-10 text-primary/50" />
+                          <span className="text-xs text-muted-foreground">Click to select screenshot (.jpg, .png)</span>
+                        </>
+                      )}
                       <input
                         type="file"
-                        accept=".txt,.csv"
+                        accept="image/*"
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (!file) return;
-                          toast.info(`Reading document: ${file.name}…`);
                           const reader = new FileReader();
-                          reader.onload = (event) => {
-                            const rawText = (event.target?.result as string) || "";
-                            const parsed = scrapeResultDocumentText(rawText);
-                            if (parsed.courses.length > 0) {
-                              setCoursesList(parsed.courses);
-                              toast.success(`Scraped ${parsed.courses.length} courses & GPA from ${file.name}!`);
-                            } else {
-                              toast.info("Document loaded. Please verify course entries below.");
-                            }
+                          reader.onload = (ev) => {
+                            setScreenshotPreview(ev.target?.result as string);
+                            toast.success("Screenshot loaded! Fill in your course details below, then submit.");
                           };
-                          reader.readAsText(file);
+                          reader.readAsDataURL(file);
                         }}
                       />
                     </label>
                   </div>
-                </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>

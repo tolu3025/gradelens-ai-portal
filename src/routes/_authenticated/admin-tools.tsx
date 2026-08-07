@@ -157,12 +157,17 @@ function AdminToolsPage() {
       const courses = Array.isArray(sub.courses_json) ? sub.courses_json : [];
       if (courses.length === 0) throw new Error("Submission has no course entries");
 
-      // 1. Insert/Upsert into grades table
+      // 1. Compute from submission data FIRST (no re-fetch needed)
+      let submissionCU = 0;
+      let submissionWP = 0;
+
       for (const c of courses) {
         const scoreVal = Number(c.score) || 0;
         const cuVal = Number(c.cu) || 3;
         const gInfo = computeGrade(scoreVal);
         const wp = gInfo.point * cuVal;
+        submissionCU += cuVal;
+        submissionWP += wp;
 
         const { error: gErr } = await supabase.from("grades").insert({
           matric_no: sub.matric_no,
@@ -183,15 +188,23 @@ function AdminToolsPage() {
         }
       }
 
-      // 2. Compute cumulative CGPA
-      const { data: allGrades } = await supabase
+      // 2. Compute cumulative CGPA: use submission totals directly (guaranteed non-zero)
+      //    Also try to fetch any previous grades for cumulative calculation
+      const { data: prevGrades } = await supabase
         .from("grades")
-        .select("credit_units, weighted_point")
-        .eq("matric_no", sub.matric_no);
+        .select("credit_units, weighted_point, level, semester")
+        .eq("matric_no", sub.matric_no)
+        .neq("level", Number(sub.level));  // only OTHER semesters (not this one)
 
-      const totalCU = (allGrades ?? []).reduce((sum: number, g: any) => sum + Number(g.credit_units || 0), 0);
-      const totalWP = (allGrades ?? []).reduce((sum: number, g: any) => sum + Number(g.weighted_point || 0), 0);
+      const prevCU = (prevGrades ?? []).reduce((s: number, g: any) => s + Number(g.credit_units || 0), 0);
+      const prevWP = (prevGrades ?? []).reduce((s: number, g: any) => s + Number(g.weighted_point || 0), 0);
+
+      const totalCU = submissionCU + prevCU;
+      const totalWP = submissionWP + prevWP;
       const newCgpa = totalCU > 0 ? Number((totalWP / totalCU).toFixed(2)) : 0;
+
+      if (totalCU === 0) throw new Error(`CGPA calculation failed: no credit units found in submission. Courses: ${JSON.stringify(courses)}`);
+
       const { classification, status } = getCgpaClassification(newCgpa);
 
       const { error: cgpaErr } = await supabase.from("cgpa_summary").upsert({
