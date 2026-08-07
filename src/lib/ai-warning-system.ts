@@ -101,44 +101,50 @@ export function calculateAcademicRiskAndPrediction(data: StudentPerformanceData)
   probability = Number(Math.min(0.99, Math.max(0.50, probability)).toFixed(4));
   const confidencePercentage = Number((probability * 100).toFixed(1));
 
-  // 4. Recommendation Engine
+  // 4. Performance-Driven Dynamic Recommendation Engine
   let recommendations: string[] = [];
   let actionPlan: string[] = [];
 
+  // Core level recommendations based on risk
   if (riskLevel === "High Risk") {
-    recommendations = [
-      "Schedule an urgent face-to-face academic counseling session.",
-      "Enroll in mandatory departmental tutorial classes for failed or weak courses.",
-      "Formulate a structured workload retake strategy with your academic advisor."
-    ];
-    actionPlan = [
-      "Meet assigned counselor within 7 days",
-      "Attend 100% of weekly peer tutorials",
-      "Establish a daily 3-hour dedicated study timetable",
-      "Consult course lecturers during office hours"
-    ];
+    recommendations.push("Schedule an urgent face-to-face academic counseling session.");
+    recommendations.push("Formulate a structured workload adjustment plan with your academic advisor.");
+    actionPlan.push("Meet assigned counselor within 7 days");
+    actionPlan.push("Establish a daily 3-hour dedicated study timetable");
   } else if (riskLevel === "Medium Risk") {
-    recommendations = [
-      "Improve lecture attendance to at least 85% across all courses.",
-      "Participate regularly in peer-led tutorial study workshops.",
-      "Review weak subject concepts with module lecturers before mid-semester tests."
-    ];
-    actionPlan = [
-      "Log lecture attendance weekly",
-      "Join department study circles",
-      "Submit continuous assessments 48 hours prior to deadline"
-    ];
+    recommendations.push("Improve lecture attendance to at least 85% across all courses.");
+    recommendations.push("Consult course lecturers during scheduled office hours.");
+    actionPlan.push("Log lecture attendance weekly");
+    actionPlan.push("Submit continuous assessments 48 hours prior to deadline");
   } else {
-    recommendations = [
-      "Maintain current high academic standards and study habits.",
-      "Explore peer mentorship opportunities to assist fellow students.",
-      "Apply for academic scholarship awards or undergraduate research projects."
-    ];
-    actionPlan = [
-      "Sustain effective daily study discipline",
-      "Volunteer as a peer tutor in Software Engineering courses",
-      "Maintain target for First Class Honours"
-    ];
+    recommendations.push("Maintain current high academic standards and study discipline.");
+    actionPlan.push("Sustain daily effective study discipline");
+  }
+
+  // Performance-specific recommendations: Failed courses
+  if (failed > 0) {
+    recommendations.push(`Enroll in mandatory departmental tutorials to address the ${failed} failed course(s).`);
+    actionPlan.push("Attend 100% of peer-led review tutorials for weak modules");
+  }
+
+  // Performance-specific recommendations: Trend & Slope
+  if (trendSlope < -0.1) {
+    recommendations.push(`Address the downward GPA trend (${trendSlope}) by reviewing continuous assessment grades early.`);
+    actionPlan.push("Limit extra-curricular activities to focus on GPA recovery");
+  } else if (trendSlope > 0.1) {
+    recommendations.push(`Outstanding upward trend (+${trendSlope}) detected! Maintain this momentum.`);
+  }
+
+  // Performance-specific recommendations: Borderline GPA milestones
+  if (cgpa >= 4.0 && cgpa < 4.5) {
+    recommendations.push("First Class Honours milestone is within reach! Aim to raise CGPA to 4.50.");
+    actionPlan.push("Volunteer as a peer tutor in Software Engineering courses");
+  } else if (cgpa >= 3.0 && cgpa < 3.5) {
+    recommendations.push("Target a minimum GPA of 3.60 next semester to elevate your CGPA to Second Class Upper.");
+  } else if (cgpa >= 2.0 && cgpa < 2.50) {
+    recommendations.push("Academic recovery: raise CGPA above 2.50 to clear risk boundaries.");
+  } else if (cgpa < 2.0) {
+    recommendations.push("Critical probation alert: reduce semester workload course credit units.");
   }
 
   return {

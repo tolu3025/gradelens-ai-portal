@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RiskCard } from "./RiskCard";
 import { PredictionCard } from "./PredictionCard";
 import { TrendChart } from "./TrendChart";
@@ -37,6 +37,19 @@ export function AIInsightPanel({
       })
     );
   });
+
+  useEffect(() => {
+    setPrediction(
+      initialPrediction ||
+      calculateAcademicRiskAndPrediction({
+        matricNo,
+        currentCgpa,
+        pastGpas,
+        failedCoursesCount,
+        totalCreditUnits,
+      })
+    );
+  }, [initialPrediction, matricNo, currentCgpa, pastGpas, failedCoursesCount, totalCreditUnits]);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 

@@ -490,14 +490,21 @@ function StudentPage() {
 
             {/* AI Academic Early Warning & Predictive Intelligence Panel */}
             <section className="mt-10">
-              <AIInsightPanel
-                matricNo={activeMatric}
-                currentCgpa={cgpaQ.data ? Number(cgpaQ.data.cgpa) : 0}
-                pastGpas={semesterStats.list.map((s) => s.gpa)}
-                failedCoursesCount={semesterStats.failedCount}
-                totalCreditUnits={cgpaQ.data?.total_credit_units ?? 0}
-                pastSemesters={semesterStats.list}
-              />
+              {cgpaQ.isLoading || gradesQ.isLoading ? (
+                <div className="flex items-center justify-center p-12 card-elevated rounded-3xl">
+                  <Loader2 className="size-8 animate-spin text-primary" />
+                  <span className="ml-3 text-sm text-muted-foreground">Analyzing academic trajectory…</span>
+                </div>
+              ) : (
+                <AIInsightPanel
+                  matricNo={activeMatric}
+                  currentCgpa={cgpaQ.data ? Number(cgpaQ.data.cgpa) : 0}
+                  pastGpas={semesterStats.list.map((s) => s.gpa)}
+                  failedCoursesCount={semesterStats.failedCount}
+                  totalCreditUnits={cgpaQ.data?.total_credit_units ?? 0}
+                  pastSemesters={semesterStats.list}
+                />
+              )}
             </section>
 
             {/* APPROVED GRADES SECTION */}
