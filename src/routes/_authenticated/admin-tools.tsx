@@ -97,8 +97,9 @@ function AdminToolsPage() {
         level: numLvl,
         semester: numSem,
         status: "APPROVED"
-      });
-      if (gErr) throw gErr;
+      }, { onConflict: "matric_no, course_code" });
+      
+      if (gErr && !gErr.message.includes("unique")) throw new Error(`Grade insert error: ${gErr.message}`);
 
       // 2. Fetch all grades for this student and compute CGPA
       const { data: allGrades, error: fetchErr } = await supabase
@@ -119,7 +120,7 @@ function AdminToolsPage() {
         .eq("matric_no", mat)
         .maybeSingle();
 
-      await supabase.from("cgpa_summary").upsert({
+      const { error: cgpaErr } = await supabase.from("cgpa_summary").upsert({
         matric_no: mat,
         level: numLvl,
         total_credit_units: totalCU,
@@ -129,7 +130,11 @@ function AdminToolsPage() {
         status,
         student_name: student?.student_name ?? `Student (${mat})`,
         last_updated: new Date().toISOString()
-      });
+      }, { onConflict: "matric_no" });
+
+      if (cgpaErr && !cgpaErr.message.includes("unique")) {
+        throw new Error(`CGPA summary insert error: ${cgpaErr.message}`);
+      }
 
       // 4. Trigger AI Predictive Analytics Workflow
       const aiResult = await runAndSaveStudentPrediction(mat);
@@ -158,7 +163,7 @@ function AdminToolsPage() {
         const gInfo = computeGrade(scoreVal);
         const wp = gInfo.point * cuVal;
 
-        await supabase.from("grades").upsert({
+        const { error: gErr } = await supabase.from("grades").upsert({
           matric_no: sub.matric_no,
           course_code: c.code.trim().toUpperCase(),
           course_title: c.title.trim() || c.code,
@@ -169,7 +174,11 @@ function AdminToolsPage() {
           level: Number(sub.level),
           semester: Number(sub.semester),
           status: "APPROVED"
-        });
+        }, { onConflict: "matric_no, course_code" });
+
+        if (gErr && !gErr.message.includes("unique")) {
+          throw new Error(`Grade insert error for ${c.code}: ${gErr.message}`);
+        }
       }
 
       // 2. Compute cumulative CGPA
@@ -183,7 +192,7 @@ function AdminToolsPage() {
       const newCgpa = totalCU > 0 ? Number((totalWP / totalCU).toFixed(2)) : 0;
       const { classification, status } = getCgpaClassification(newCgpa);
 
-      await supabase.from("cgpa_summary").upsert({
+      const { error: cgpaErr } = await supabase.from("cgpa_summary").upsert({
         matric_no: sub.matric_no,
         level: Number(sub.level),
         total_credit_units: totalCU,
@@ -193,7 +202,11 @@ function AdminToolsPage() {
         status,
         student_name: sub.student_name || `Student (${sub.matric_no})`,
         last_updated: new Date().toISOString()
-      });
+      }, { onConflict: "matric_no" });
+
+      if (cgpaErr && !cgpaErr.message.includes("unique")) {
+        throw new Error(`CGPA summary insert error: ${cgpaErr.message}`);
+      }
 
       // 3. Trigger AI Predictions
       await runAndSaveStudentPrediction(sub.matric_no);
