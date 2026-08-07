@@ -848,34 +848,66 @@ function scrapeResultDocumentText(rawText: string) {
   let currentGpa: number | null = null;
   let previousGpa: number | null = null;
 
-  const courseRegex = /([A-Z]{2,4}\s?\d{3})/i;
+  // UNIOSUN Specific Format Regex
+  // e.g., "COS201	Computer Programming I	3	C	56	C"
+  const uniosunCourseRegex = /^([A-Z]{3}\s?\d{3})\s+(.+?)\s+(\d)\s+[A-Z]\s+(\d{1,3})\s+[A-F]$/i;
+  
+  // UNIOSUN GPA matches
+  const uniosunCurrentRegex = /^CURRENT\s+\d+\s+\d+\s+([0-9.]+)/i;
+  const uniosunPreviousRegex = /^PREVIOUS\s+\d+\s+\d+\s+([0-9.]+)/i;
+
+  // Generic Fallbacks
+  const genericCourseRegex = /([A-Z]{2,4}\s?\d{3})/i;
   const gpaRegex = /(?:current\s+)?gpa[:\s]+([0-4]\.\d{1,2}|5\.00?)/i;
   const cgpaRegex = /(?:previous\s+gpa|cgpa)[:\s]+([0-4]\.\d{1,2}|5\.00?)/i;
 
-  for (const line of lines) {
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) continue;
+
+    // 1. Check GPA
+    const uCurrMatch = line.match(uniosunCurrentRegex);
+    if (uCurrMatch) currentGpa = parseFloat(uCurrMatch[1]);
+    
+    const uPrevMatch = line.match(uniosunPreviousRegex);
+    if (uPrevMatch) previousGpa = parseFloat(uPrevMatch[1]);
+
     const gMatch = line.match(gpaRegex);
     if (gMatch && !currentGpa) currentGpa = parseFloat(gMatch[1]);
 
     const cgMatch = line.match(cgpaRegex);
     if (cgMatch && !previousGpa) previousGpa = parseFloat(cgMatch[1]);
 
-    const cMatch = line.match(courseRegex);
+    // 2. Check Courses
+    const uCourseMatch = line.match(uniosunCourseRegex);
+    if (uCourseMatch) {
+      courses.push({
+        code: uCourseMatch[1].toUpperCase(),
+        title: uCourseMatch[2].trim(),
+        cu: parseInt(uCourseMatch[3], 10),
+        score: parseInt(uCourseMatch[4], 10),
+      });
+      continue;
+    }
+
+    // Generic fallback for other schools or distorted PDF text
+    const cMatch = line.match(genericCourseRegex);
     if (cMatch) {
       const code = cMatch[1].toUpperCase();
-      const numbers = line.match(/\b\d{1,3}\b/g)?.map(Number) ?? [];
+      if (courses.some((c) => c.code === code)) continue;
 
+      const lineWithoutCode = line.replace(cMatch[0], "");
+      const numbers = lineWithoutCode.match(/\b\d{1,3}\b/g)?.map(Number) ?? [];
+      
       const cu = numbers.find((n) => n >= 1 && n <= 6) ?? 3;
-      const score = numbers.find((n) => n >= 35 && n <= 100) ?? 70;
+      const score = numbers.reverse().find((n) => n >= 0 && n <= 100) ?? 70;
 
-      let title = line
-        .replace(cMatch[0], "")
+      let title = lineWithoutCode
         .replace(/\b\d{1,3}\b/g, "")
         .replace(/[A-F]\b/i, "")
         .trim();
 
-      if (!title || title.length < 3) {
-        title = `Course ${code}`;
-      }
+      if (!title || title.length < 3) title = `Course ${code}`;
 
       courses.push({ code, title, cu, score });
     }
