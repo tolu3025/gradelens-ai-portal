@@ -96,8 +96,7 @@ function AdminToolsPage() {
         credit_units: numCu,
         weighted_point: wp,
         level: numLvl,
-        semester: numSem,
-        status: "APPROVED"
+        semester: numSem
       });
       
       if (gErr) throw new Error(`Grade insert error: ${gErr.message}`);
@@ -179,8 +178,7 @@ function AdminToolsPage() {
           credit_units: cuVal,
           weighted_point: wp,
           level: Number(sub.level),
-          semester: Number(sub.semester),
-          status: "APPROVED"
+          semester: Number(sub.semester)
         });
 
         if (gErr) {
@@ -595,11 +593,11 @@ function computeGrade(score: number) {
 }
 
 function getCgpaClassification(cgpa: number) {
-  if (cgpa >= 4.5) return { classification: "First Class", status: "GOOD_STANDING" };
-  if (cgpa >= 3.5) return { classification: "Second Class Upper", status: "GOOD_STANDING" };
-  if (cgpa >= 2.4) return { classification: "Second Class Lower", status: "GOOD_STANDING" };
-  if (cgpa >= 1.5) return { classification: "Third Class", status: "ACADEMIC_WARNING" };
-  return { classification: "Pass / Probation", status: "PROBATION" };
+  if (cgpa >= 4.5) return { classification: "First Class" as const, status: "ABOVE AVERAGE" as const };
+  if (cgpa >= 3.5) return { classification: "Second Class Upper" as const, status: "ABOVE AVERAGE" as const };
+  if (cgpa >= 2.4) return { classification: "Second Class Lower" as const, status: "AVERAGE" as const };
+  if (cgpa >= 1.5) return { classification: "Third Class" as const, status: "BELOW AVERAGE" as const };
+  return { classification: "Fail" as const, status: "BELOW AVERAGE" as const };
 }
 
 function NotAllowed() {
