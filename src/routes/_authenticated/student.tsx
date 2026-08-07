@@ -554,15 +554,33 @@ function StudentPage() {
                 <div className="rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 p-5 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <FileSpreadsheet className="size-8 text-primary" />
-                    <span className="text-sm font-bold text-foreground">Auto-Scrape Printed Result Document (.PDF / .TXT / .CSV)</span>
+                    <span className="text-sm font-bold text-foreground">Auto-Scrape Printed Result Document</span>
                     <span className="text-xs text-muted-foreground max-w-md">
-                      Upload your printed school portal result document to automatically extract course codes, credit units, scores, current GPA, and CGPA metrics.
+                      Paste the text from your PDF result below, or upload a .TXT/.CSV file to automatically extract your courses, credit units, and scores.
                     </span>
-                    <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-md">
-                      <Upload className="size-4" /> Select Result Document File
+
+                    <textarea 
+                      placeholder="Paste your PDF result text here to auto-extract courses..."
+                      className="mt-3 w-full rounded-xl border border-border bg-card px-4 py-3 text-xs font-mono outline-none focus:ring-2 focus:ring-primary/40 min-h-[100px]"
+                      onChange={(e) => {
+                        const rawText = e.target.value;
+                        if (rawText.length > 30) {
+                          const parsed = scrapeResultDocumentText(rawText);
+                          if (parsed.courses.length > 0) {
+                            setCoursesList(parsed.courses);
+                            toast.success(`Scraped ${parsed.courses.length} courses & GPA from pasted text!`);
+                          }
+                        }
+                      }}
+                    />
+                    
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 my-2">OR</span>
+
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground hover:opacity-90 transition shadow-md">
+                      <Upload className="size-4" /> Upload .TXT or .CSV File
                       <input
                         type="file"
-                        accept=".pdf,.txt,.csv,.doc,.docx"
+                        accept=".txt,.csv"
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
