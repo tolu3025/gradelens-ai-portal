@@ -875,7 +875,8 @@ function scrapeResultDocumentText(rawText: string) {
   const uniosunPreviousRegex = /^PREVIOUS\s+\d+\s+\d+\s+([0-9.]+)/i;
 
   // Generic Fallbacks
-  const genericCourseRegex = /([A-Z]{2,4}\s?\d{3})/i;
+  // Restrict generic course regex to word boundaries to avoid matching dates like "FOR 2025" or "LEVEL: 200"
+  const genericCourseRegex = /\b([A-Z]{2,4})\s?(\d{3})\b/i;
   const gpaRegex = /(?:current\s+)?gpa[:\s]+([0-4]\.\d{1,2}|5\.00?)/i;
   const cgpaRegex = /(?:previous\s+gpa|cgpa)[:\s]+([0-4]\.\d{1,2}|5\.00?)/i;
 
