@@ -278,16 +278,16 @@ function StudentPage() {
   })();
 
   const addCourseRow = () => {
-    setCoursesList((prev) => [...prev, { code: "", title: "", cu: 3, score: 70 }]);
+    setCoursesList((prev: any[]) => [...prev, { code: "", title: "", cu: 3, score: 70 }]);
   };
 
   const removeCourseRow = (index: number) => {
-    setCoursesList((prev) => prev.filter((_, i) => i !== index));
+    setCoursesList((prev: any[]) => prev.filter((_: any, i: number) => i !== index));
   };
 
   const updateCourseRow = (index: number, field: string, value: any) => {
-    setCoursesList((prev) =>
-      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
+    setCoursesList((prev: any[]) =>
+      prev.map((c: any, i: number) => (i === index ? { ...c, [field]: value } : c))
     );
   };
 

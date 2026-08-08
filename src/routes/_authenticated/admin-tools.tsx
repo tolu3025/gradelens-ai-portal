@@ -39,7 +39,7 @@ function AdminToolsPage() {
         .select("id, role, user_id")
         .order("role", { ascending: true });
       if (error) throw error;
-      const ids = Array.from(new Set((roles ?? []).map((r) => r.user_id)));
+      const ids = Array.from(new Set((roles ?? []).map((r: any) => r.user_id)));
       let profileMap = new Map<string, { full_name: string | null; email: string | null }>();
       if (ids.length) {
         const { data: profs } = await supabase
@@ -49,7 +49,7 @@ function AdminToolsPage() {
         for (const p of profs ?? []) profileMap.set(p.id, { full_name: p.full_name, email: p.email });
       }
 
-      return (roles ?? []).map((r) => ({
+      return (roles ?? []).map((r: any) => ({
         id: r.id,
         role: r.role,
         profile: profileMap.get(r.user_id),
@@ -108,8 +108,8 @@ function AdminToolsPage() {
         .eq("matric_no", mat);
       if (fetchErr) throw fetchErr;
 
-      const totalCU = (allGrades ?? []).reduce((sum, g) => sum + Number(g.credit_units || 0), 0);
-      const totalWP = (allGrades ?? []).reduce((sum, g) => sum + Number(g.weighted_point || 0), 0);
+      const totalCU = (allGrades ?? []).reduce((sum: number, g: any) => sum + Number(g.credit_units || 0), 0);
+      const totalWP = (allGrades ?? []).reduce((sum: number, g: any) => sum + Number(g.weighted_point || 0), 0);
       const newCgpa = totalCU > 0 ? Number((totalWP / totalCU).toFixed(2)) : 0;
       const { classification, status } = getCgpaClassification(newCgpa);
 
@@ -140,7 +140,7 @@ function AdminToolsPage() {
       const aiResult = await runAndSaveStudentPrediction(mat);
       return { mat, newCgpa, aiResult };
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       toast.success(
         `Grade saved! CGPA: ${data.newCgpa.toFixed(2)} | AI Risk: ${data.aiResult.prediction.riskLevel}`
       );
@@ -233,7 +233,7 @@ function AdminToolsPage() {
       if (subErr) throw subErr;
       return { matric: sub.matric_no, newCgpa };
     },
-    onSuccess: (res) => {
+    onSuccess: (res: any) => {
       toast.success(`Approved result for ${res.matric}! CGPA updated: ${res.newCgpa.toFixed(2)}`);
       qc.invalidateQueries();
     },
