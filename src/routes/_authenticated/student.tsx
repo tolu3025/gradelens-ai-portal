@@ -244,6 +244,7 @@ function StudentPage() {
         semester: Number(subSemester),
         courses_json: coursesList,
         status: "PENDING",
+        screenshot_base64: screenshotPreview,
       });
 
       if (error) throw error;
@@ -251,6 +252,7 @@ function StudentPage() {
     onSuccess: () => {
       toast.success("Semester Result submitted! Pending Admin Approval.");
       setShowUploadModal(false);
+      setScreenshotPreview(null);
       qc.invalidateQueries({ queryKey: ["my-submissions"] });
     },
     onError: (e: any) => toast.error(e.message || "Failed to submit result"),

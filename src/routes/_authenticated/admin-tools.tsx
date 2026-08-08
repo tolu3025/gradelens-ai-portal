@@ -369,6 +369,21 @@ function AdminToolsPage() {
                               ))}
                             </div>
 
+                            {sub.screenshot_base64 && (
+                              <div className="mt-4">
+                                <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground block mb-1.5">
+                                  Portal Verification Screenshot
+                                </span>
+                                <div className="relative rounded-xl overflow-hidden border border-border bg-secondary/20 p-1">
+                                  <img
+                                    src={sub.screenshot_base64}
+                                    alt="Verification Screenshot"
+                                    className="max-h-40 w-full object-contain rounded-lg shadow-sm bg-black/5"
+                                  />
+                                </div>
+                              </div>
+                            )}
+
                             <div className="mt-4 flex gap-2">
                               <button
                                 onClick={() => approveSubmissionMutation.mutate(sub)}
