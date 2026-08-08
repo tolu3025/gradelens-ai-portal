@@ -1,12 +1,18 @@
-import { Compass, CheckCircle2, ArrowRight } from "lucide-react";
+import { Compass, CheckCircle2, Cpu, BookOpen } from "lucide-react";
 
 interface RecommendationCardProps {
   riskLevel: string;
   recommendations: string[];
   actionPlan?: string[];
+  isMLPowered?: boolean;
 }
 
-export function RecommendationCard({ riskLevel, recommendations, actionPlan = [] }: RecommendationCardProps) {
+export function RecommendationCard({
+  riskLevel,
+  recommendations,
+  actionPlan = [],
+  isMLPowered = false,
+}: RecommendationCardProps) {
   const isHigh = riskLevel.toUpperCase().includes("HIGH");
   const isMedium = riskLevel.toUpperCase().includes("MEDIUM");
 
@@ -14,9 +20,27 @@ export function RecommendationCard({ riskLevel, recommendations, actionPlan = []
 
   return (
     <div className="card-elevated rounded-3xl p-6 md:p-8">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground font-semibold">
-        <Compass className={`size-4 ${headerTone}`} />
-        AI Recommended Action Plan
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground font-semibold">
+          <Compass className={`size-4 ${headerTone}`} />
+          AI Recommended Action Plan
+        </div>
+
+        {/* ML-powered vs Rule-based badge */}
+        <div
+          className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+            isMLPowered
+              ? "bg-primary/10 text-primary"
+              : "bg-muted/50 text-muted-foreground"
+          }`}
+        >
+          {isMLPowered ? (
+            <Cpu className="size-3" />
+          ) : (
+            <BookOpen className="size-3" />
+          )}
+          {isMLPowered ? "Real-time ML Suggestions" : "Rule-based Suggestions"}
+        </div>
       </div>
 
       <div className="mt-4 space-y-3">
